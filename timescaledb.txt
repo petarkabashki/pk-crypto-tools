@@ -1,0 +1,19 @@
+Install
+
+git clone https://github.com/timescale/timescaledb.git
+cd timescaledb
+git checkout <release_tag>  # e.g., git checkout 2.2.1
+
+# Bootstrap the build system
+ ./bootstrap  -DREGRESS_CHECKS=OFF
+
+# To build the extension
+cd build && make
+
+# To install
+make install
+
+
+***************************************************************
+
+
