@@ -1,10 +1,31 @@
 Install:
 
+-------------------------------
+openssl:
+
+If you need to have openssl@1.1 first in your PATH, run:
+  echo 'export PATH="/usr/local/opt/openssl@1.1/bin:$PATH"' >> ~/.zshrc
+
+For compilers to find openssl@1.1 you may need to set:
+  export LDFLAGS="-L/usr/local/opt/openssl@1.1/lib"
+  export CPPFLAGS="-I/usr/local/opt/openssl@1.1/include"
+
+For pkg-config to find openssl@1.1 you may need to set:
+  export PKG_CONFIG_PATH="/usr/local/opt/openssl@1.1/lib/pkgconfig"
+
+-------------------------------
+
 download source from https://www.postgresql.org/ftp/source/v13.3/
+
+
 
 mkdir -p usr/local/pgsql
 
-./configure --prefix=$HOME/quant/py-crypto-tools/usr/local/pgsql --with-python --with-openssl
+
+
+./configure --enable-R-shlib --prefix=$HOME/quant/py-crypto-tools/usr/local/pgsql --with-python --with-openssl
+
+
 make
 make install
 
@@ -54,6 +75,8 @@ psql -U postgres -h localhost -d trader
 CREATE TABLE klines (
     time        TIMESTAMPTZ       NOT NULL,
     symb      TEXT              NOT NULL,
+    curr      TEXT              NOT NULL,
+    ticker      TEXT              NOT NULL,
     src      TEXT              NOT NULL,
     res  TEXT              NOT NULL,
     open DOUBLE PRECISION  NOT NULL,
@@ -62,6 +85,7 @@ CREATE TABLE klines (
     close DOUBLE PRECISION  NOT NULL,
     volume DOUBLE PRECISION  NULL
 );
+
 
 SELECT create_hypertable('klines', 'time');
 
@@ -78,7 +102,5 @@ SELECT * FROM pg_stat_activity WHERE state IN ('active', 'idle in transaction') 
 for f in data/binance/*.csv
 do
   echo "Processing $f file..."
-  psql -U postgres -d trader -c "\COPY klines FROM $f CSV HEADER"
-  # take action on each file. $f store current file name
-  # head -n 1 $f
+  psql -U postgres -d trader -c "\COPY klines(time,symb,curr,ticker,src,res,open,high,low,close,volume) FROM $f CSV HEADER DELIMITER ','"
 done
