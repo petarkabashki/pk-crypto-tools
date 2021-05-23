@@ -2,3 +2,10 @@ config.py
 .ipynb*
 __pycache__
 data
+.vscode
+src
+*.log
+.~*
+trades.csv
+*.png
+usr/
