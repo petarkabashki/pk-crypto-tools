@@ -31,3 +31,8 @@ trueRange = zeros(nrows)
 # (emaslow, emafast, emascalp) = (zeros(Float32, nrows), zeros(Float32, nrows), zeros(Float32, nrows))
 
 # [100,50,21] .|>(x->(2/(1+x)))
+
+
+##############################################
+### Load DataFrame from JSON
+
