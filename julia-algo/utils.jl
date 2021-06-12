@@ -26,7 +26,7 @@ function window_slider(len; subs=1)
     
     map!(make_startslider, start_slider_box, window_size)
 #     output = Interact.@map (&window_no * &window_size , (1 + &window_no) * &window_size - 1)
-    output = Interact.@map [&window_start , &window_end]
+    output = Interact.@map &window_start: &window_end
     
     wdg = Widget(["log2_slider" => log2_slider, "start_slider_box" => start_slider_box, "window_start" => window_start,
             "window_size" => window_size, "window_end" => window_end], output = output)
