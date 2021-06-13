@@ -1,0 +1,1 @@
+slKama1N[]=10;slKama1Slow[]=0.0645;slKama1Channel[]=2.5;stopsl[]=2.0;targetsl[]=1.0;slKama1Fast[]=0.6667;cooloffsl[]=30;
