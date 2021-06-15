@@ -10,3 +10,5 @@ trades.csv
 *.png
 usr/
 user_data
+kucoin.config.json
+key.enc
