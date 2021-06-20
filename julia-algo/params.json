@@ -1,1 +1,13 @@
-{"interactive":{"wsl[:log2_slider]":11,"slKama1Slow":0.3,"slTarget":3.0,"slKama1Channel":0.75,"slKama1Fast":0.86,"slStopLoss":0.9,"slCoolOff":410,"slKama1N":230}}
+{
+    "interactive": {
+        "wsl[:log2_slider]": 11,
+        "slKama1Slow": 0.42,
+        "slTarget": 3.4,
+        "slKama1Channel": 0.7,
+        "slKama1Fast": 0.34,
+        "slStopLoss": 0.9,
+        "slCoolOff": 370,
+        "slKama1N": 70,
+        "slDowntrendWait": 48
+    }
+}
