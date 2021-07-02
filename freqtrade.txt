@@ -23,7 +23,7 @@ freqtrade backtesting --datadir user_data/data/binance  --export trades --stake-
 
 
 
-freqtrade download-data --userdir freqtrade-user-data --exchange binance -t 1m --timerange 20210101- -p BTC/USDT
+freqtrade download-data --userdir freq-user-data --exchange binance -t 1m --timerange 20210601- -p BTC/USDT
 
 freqtrade download-data --userdir freqtrade-user-data --exchange binance -t 1m --timerange 20210101- -p BTC/USDT
 
