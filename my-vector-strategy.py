@@ -4,24 +4,28 @@ Spyder Editor
 
 This is a temporary script file.
 """
-
+#%%
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy as np
+from collections import OrderedDict
 
 from datetime import datetime
-import talib
+# import talib
 import pandas_ta as ta
-from talib.abstract import *
+# from talib.abstract import *
 from math import *
-import pandas_ta as ta
 import seaborn as sns
 #import vectorbt as vbt
 import ffn
 
+#%%
 
+matplotlib.rcParams.update({'font.size': 5, 'lines.linewidth': 0.5, 'figure.dpi': 300})
+
+#%%
 df = pd.read_json(r'freq-user-data/data/binance/BTC_USDT-1m.json')
 df.columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
 
@@ -39,6 +43,7 @@ df.set_index(pd.DatetimeIndex(df["time"]), inplace=True, drop=True)
 
 # start_time = pd.Timestamp('now') + pd.Timedelta(-2, unit='W')
 
+#%%
 start_time = datetime(2021,4,10)
 end_time = datetime(2021,7,3)
 
@@ -47,38 +52,43 @@ ddf = df.loc[(df.index >= start_time) & (df.index <= end_time)].copy().sort_inde
 # ddf
 dlen = len(ddf.index)
 
+
+ddf = ddf.resample('15Min').agg(
+    OrderedDict([
+        ('open', 'first'),
+        ('high', 'max'),
+        ('low', 'min'),
+        ('close', 'last'),
+        ('volume', 'sum'),
+    ])
+).dropna()
+
+#%%
+
+
 ddf['lret'] = ddf.close.apply(np.log).diff(1)
 ddf['cumlret'] = ddf.lret.cumsum()
 
+# bb_middleband = talib.EMA(ddf['close'], timeperiod=21)
+ddf_bbands = ddf.ta.bbands(length=14, std=2.7, mamode='EMA', ddof=0, offset=None)
 
-# define the technical analysis matrix
-o,h,l,c = ddf.open, ddf.high, ddf.low, ddf.close
-cc = ddf.close
-# Most data series are normalized by their series' mean
-ta = pd.DataFrame()
-ta['MA5'] = talib.MA(cc, timeperiod=5) 
-ta['MA10'] = talib.MA(cc, timeperiod=10)
-ta['MA20'] = talib.MA(cc, timeperiod=20)
-ta['MA60'] = talib.MA(cc, timeperiod=60) 
-ta['MA120'] = talib.MA(cc, timeperiod=120) 
-# ta['MA5'] = talib.MA(v, timeperiod=5) / talib.MA(v, timeperiod=5).mean()
-# ta['MA10'] = talib.MA(v, timeperiod=10) / talib.MA(c, timeperiod=10).mean()
-# ta['MA20'] = talib.MA(v, timeperiod=20) / talib.MA(c, timeperiod=20).mean()
-# ta['ADX'] = talib.ADX(h, l, c, timeperiod=14) / talib.ADX(h, l, c, timeperiod=14).mean()
-# ta['ADXR'] = talib.ADXR(h, l, c, timeperiod=14) / talib.ADXR(h, l, c, timeperiod=14).mean()
-# ta['MACD'] = (talib.MACD(cc, fastperiod=12, slowperiod=26, signalperiod=9)[0]
-             
-ta['RSI'] = talib.RSI(cc, timeperiod=14)
-# ta['BBANDS_U'] = (talib.BBANDS(cc, timeperiod=5, nbdevup=2, nbdevdn=2, matype=0)[0] 
-# ta['BBANDS_M'] = (talib.BBANDS(cc, timeperiod=5, nbdevup=2, nbdevdn=2, matype=0)[1] 
-# ta['BBANDS_L'] = (talib.BBANDS(cc, timeperiod=5, nbdevup=2, nbdevdn=2, matype=0)[2]
-# ta['AD'] = talib.AD(h, l, c, v) / talib.AD(h, l, c, v).mean()
-# ta['ATR'] = talib.ATR(h, l, c, timeperiod=14) / talib.ATR(h, l, c, timeperiod=14).mean()
-# ta['HT_DC'] = talib.HT_DCPERIOD(c)
-# ta["High/Open"] = h / o
-# ta["Low/Open"] = l / o
-# ta["Close/Open"] = c / o
+ddf_bbands.columns = ['bb_lower', 'bb_middle', 'bb_upper', 'bb_bandwidth', 'bb_percent']
 
+# ddf = pd.concat([ddf, ddf_bbands])
+ddf['mema'] = ta.ema(ddf.close, length=26)
+# bb_upperband, bb_middleband, bb_lowerband = talib.BBANDS(ddf['close'], timeperiod=21, nbdevup=2., nbdevdn=2.5, matype=0)
+# # len(bb_upperband), len(ddf)
+# ddf['bb_upper'] = bb_upperband
+# ddf['bb_middle'] = bb_middleband
+# ddf['bb_lower'] = bb_lowerband
+
+
+# krnl = np.linspace(0, 0.2, 10) ** 2 / 2 - 0.01
+# krnl = krnl * 100
+
+
+
+#%%
 
 capital = 10000
 pos_size = 100.
@@ -88,15 +98,15 @@ fee = 0.001
 
 #ddf['ema26'] = talib.EMA(ddf.close, 26)
 
-w1 = 50 # short-term moving average window
-w2 = 120 # long-term moving average window
-w3 = 240
+# w1 = 50 # short-term moving average window
+# w2 = 120 # long-term moving average window
+# w3 = 240
 # ma_x = ddf.close.rolling(w1).mean() - ddf.close.rolling(w2).mean()
 
-ddf['fema'] = talib.EMA(ddf.close, w1)
-ddf['sema'] = talib.EMA(ddf.close, w2)
-ddf['lema'] = talib.EMA(ddf.close, w3)
-tper = int(60 * 3)
+# ddf['fema'] = talib.EMA(ddf.close, w1)
+# ddf['sema'] = talib.EMA(ddf.close, w2)
+# ddf['lema'] = talib.EMA(ddf.close, w3)
+# tper = int(60 * 3)
 
 # ddf['ret'] = ddf.close - ddf.close.shift(fill_value=0)
 # ddf['pct_change'] = ddf.close.pct_change()
@@ -112,8 +122,8 @@ tper = int(60 * 3)
 # ddf['fufemaperc'] = (ddf.fufema - ddf.close) / ddf.close * 100
 # ddf['rr'] = ddf['fumaxperc'] / ddf['fuminperc']
 
-ddf['macd'] = ddf.fema - ddf.sema
-ddf['macdperc'] = np.log(ddf.macd / ddf.sema)
+# ddf['macd'] = ddf.fema - ddf.sema
+# ddf['macdperc'] = np.log(ddf.macd / ddf.sema)
 
 # bb_upper, bb_middle, bb_lower = talib.BBANDS(
 #                                 ddf.close.values, 
@@ -183,30 +193,45 @@ perf.plot()
 perf.display()
 
 #
-
-q = '"2021-06-01 00" <= time < "2021-06-2"'
+#%%
+q = '"2021-06-01 00" <= time < "2021-06-29"'
 wdf = ddf.query(q)
+wdf_bbands = ddf_bbands.query(q)
 # wta = ta.query(q)
-wdf_buys = wdf[wdf.buy > 0]
-wdf_sells = wdf[wdf.sell > 0]
+# wdf_buys = wdf[wdf.buy > 0]
+# wdf_sells = wdf[wdf.sell > 0]
 # set downtrend values to 0
 # wdf.loc[macd_lt0_mask, ['cross_cumlret', 'max_ret', 'min_ret', 'cross_since', 'trend_len']] = 0
 
-matplotlib.rcParams.update({'font.size': 3, 'lines.linewidth': 0.2})
+#%%
 
-fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, sharex=True, gridspec_kw={'height_ratios':[2,1,1,1]},
-                                         )
+plt.close("all")
+fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True, gridspec_kw={'height_ratios':[2,1,1]},)
 # fig.legend(fontsize=3)
+
 ax1.plot(wdf.close)
-ax1.plot(wdf.fema)
-ax1.plot(wdf.sema)
-ax1.plot(wdf.lema)
-ax1.fill_between(wdf.index, y1=wdf.fema*0.995, y2=wdf.fema*1.005, alpha=0.2 )
-ax1.vlines(wdf_buys.index, wdf.close.min(), wdf.close.max())
-ax1.vlines(wdf_sells.index, wdf.close.min(), wdf.close.max(),color='orange')
+ax1.plot(wdf.low, lw=0.3)
+ax1.plot(wdf.high, lw=0.3)
+ax1.plot(wdf_bbands.bb_lower)
+ax1.plot(wdf_bbands.bb_upper)
+ax1.plot(wdf_bbands.bb_middle)
+ax1.plot(wdf.mema, lw=1)
+# ax1.plot(wdf.fema)
+# ax1.plot(wdf.sema)
+# ax1.plot(wdf.lema)
+ax1.fill_between(wdf_bbands.index, y1=wdf_bbands.bb_middle*0.99, y2=wdf_bbands.bb_middle*1.01, alpha=0.2 )
+# ax1.vlines(wdf_buys.index, wdf.close.min(), wdf.close.max())
+# ax1.vlines(wdf_sells.index, wdf.close.min(), wdf.close.max(),color='orange')
+
+ax2.plot(wdf_bbands.bb_bandwidth)
+ax2.plot(wdf_bbands.bb_percent)
 
 
-ax2.plot(wdf.cumlret)
+ax3.plot(wdf.krnl_trend)
+
+#%%
+# ax2.plot(wdf.cumlret)
+# ax2.plot(wdf.close)
 # ax2.plot(wta.MA20)
 # ax2.axhline(lw=0.5)
 # ax2.vlines(wdf_buys.index, wdf.posret.min(), wdf.posret.max(),lw=0.2)
@@ -216,11 +241,11 @@ ax2.plot(wdf.cumlret)
 # ax3.vlines(wdf_buys.index, g_buy[wdf.index].min(), g_buy[wdf.index].max(),lw=0.2)
 # ax3.vlines(wdf_sells.index, g_buy[wdf.index].min(), g_buy[wdf.index].max(),lw=0.2,color='orange')
 
-ax3.plot(wdf.equity)
+# ax3.plot(wdf.equity)
 # ax3.vlines(wdf_buys.index, wdf.equity.min(), wdf.equity.max(),lw=0.2)
 # ax3.vlines(wdf_sells.index, wdf.equity.min(), wdf.equity.max(),lw=0.2,color='orange')
 
-ax4.plot(wdf.returns)
+# ax4.plot(wdf.returns)
 # plt.tick_params(labelsize=2)
 
 
@@ -244,15 +269,63 @@ ax4.plot(wdf.returns)
 # ax4.fill_between(wdf.index, wdf.g_cross.min(), wdf.g_cross.max(),alpha=0.9, 
 #                  color='grey', where=wdf.macd_lt0_mask)
 
+#%% kernels
 
-# 
+# idxs = np.arange(10)
+krnl_len = 20
+krnl_idxs = np.linspace(1/4 * pi, (2 - 1/4) * pi, krnl_len) 
+krnl = np.exp(np.sin(krnl_idxs) ) -2
+# ** 2 #/ 2 - 0.01
+# krnlx = np.array(krnlx * 100)
+krnlx = np.flipud(krnl)
+
+plt.close("all")
+fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios':[1,1]})
+ax1.plot(krnl_idxs)
+ax2.plot(krnl)
+ax2.plot(krnlx)
+
+#%%
+
+ddf['krnl_trend'] = ddf.cumlret.rolling(16).apply(lambda v: (v * krnl).sum())
+
+#%%
+
+q = '"2021-06-2 00" <= time < "2021-06-7"'
+wdf = ddf.query(q)
+wdf_bbands = ddf_bbands.query(q)
+wdf['sin_krn'] = wdf_bbands.bb_middle.rolling(krnl_len).apply(lambda v: (v * krnlx).sum())
+
+wdf['sin_krn_gt0'] = wdf['sin_krn'] > 0
+wdf_crosses = (wdf.sin_krn_gt0) & (~wdf.sin_krn_gt0).shift()
+
+plt.close("all")
+fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True, gridspec_kw={'height_ratios':[2,1,1]})
+
+ax1.plot(wdf.close)
+# ax1.plot(wdf.mema)
+ax1.plot(wdf_bbands.bb_lower)
+ax1.plot(wdf_bbands.bb_middle)
+
+ax1.vlines(wdf_crosses[wdf_crosses].index, wdf.close.min(), wdf.close.max(),lw=0.5)
+ax1.fill_between(wdf_bbands.index, y1=wdf_bbands.bb_middle*0.99, y2=wdf_bbands.bb_middle*1.01, alpha=0.1 )
+
+# ax2.plot(wdf.cumlret.rolling(krnl_len).apply(lambda v: (v * krnl).sum()))
+# ax2.plot(wdf.cumlret.rolling(krnl_len).apply(lambda v: (v * krnlx).sum()))
+# ax2.axhline()
+# ax3.plot(wdf_bbands.bb_middle.rolling(krnl_len).apply(lambda v: (v * krnl).sum()))
+ax2.plot(wdf.sin_krn)
+ax2.vlines(wdf_crosses[wdf_crosses].index, wdf.sin_krn.min(), wdf.sin_krn.max(),lw=0.5)
+# ax2.axhline()
+
+#%%
 
 
 # distribution of period of uptrend > 0
 zdf = ddf[macd_gt0_mask].groupby(g_cross).cross_since.max()
 sns.displot(zdf, binwidth=5)
 
-
+#%%
 # distribution of max cumulative log returns when macd > 0
 # zdf = ddf[macd_gt0_mask].groupby(g_cross).cross_cumlret.max()
 sns.displot(ddf[macd_gt0_mask].max_ret)
