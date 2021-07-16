@@ -274,7 +274,7 @@ ax3.plot(wdf.krnl_trend)
 # idxs = np.arange(10)
 krnl_len = 20
 krnl_idxs = np.linspace(1/4 * pi, (2 - 1/4) * pi, krnl_len) 
-krnl = np.exp(np.sin(krnl_idxs) ) -2
+# krnl = np.exp(np.sin(krnl_idxs) ) -2
 # ** 2 #/ 2 - 0.01
 # krnlx = np.array(krnlx * 100)
 krnlx = np.flipud(krnl)
