@@ -1,1 +1,1 @@
-{"w2log": 12, "w": 13, "stoploss": 1.65, "take_proffit": 2.0, "bbma": 50, "bbstn": 50, "bbstd": 3.4, "krn": 500.0, "krstart": 0.8, "krend": 1.44, "krpow": 3.0, "krflip": true, "krflipy": false, "cnv": [-1.0, 1.0]}
+{"w2log": 12, "w": 7, "stoploss": -0.02, "takeprofit": 0.02, "bbma": 50, "bbstn": 26, "bbstd": 2.0, "dmper": 21}

@@ -38,29 +38,25 @@ class BBandsStrategy(IStrategy):
     # Check the documentation or the Sample strategy to get the latest version.
     INTERFACE_VERSION = 2
 
-    # Minimal ROI designed for the strategy.
-    # This attribute will be overridden if the config file contains "minimal_roi".
+
+    # ROI table:
     minimal_roi = {
-        "60": 0.015,
-        "30": 0.02,
-        "0": 0.04
+        "0": 0.02,
     }
 
-    pars = {}
+    # Stoploss:
+    stoploss = -0.02
 
-    # Optimal stoploss designed for the strategy.
-    # This attribute will be overridden if the config file contains "stoploss".
-    stoploss = -0.01
-
-    # Trailing stoploss
-    trailing_stop = False
+    # Trailing stop:
+    # trailing_stop = True
+    # trailing_stop_positive = 0.142
+    # trailing_stop_positive_offset = 0.232
     # trailing_only_offset_is_reached = False
-    # trailing_stop_positive = 0.01
-    # trailing_stop_positive_offset = 0.0  # Disabled / not configured
 
-    # Hyperoptable parameters
-    # buy_rsi = IntParameter(low=1, high=50, default=30, space='buy', optimize=True, load=True)
-    # sell_rsi = IntParameter(low=50, high=100, default=70, space='sell', optimize=True, load=True)
+    bbma = IntParameter(low=3, high=300, default=50, space='buy', optimize=True, load=True)
+    bbstn = IntParameter(low=3, high=300, default=26, space='buy', optimize=True, load=True)
+    bbstd = DecimalParameter(low=0, high=3, default=2, space='buy', optimize=True, load=True)
+    takeprofit = DecimalParameter(low=0.005, high=0.05, default=0.02, space='buy', optimize=True, load=True)
 
     # Optimal timeframe for the strategy.
     timeframe = '1m'
@@ -69,12 +65,12 @@ class BBandsStrategy(IStrategy):
     process_only_new_candles = False
 
     # These values can be overridden in the "ask_strategy" section in the config.
-    use_sell_signal = True
+    use_sell_signal = False
     sell_profit_only = False
     ignore_roi_if_buy_signal = False
 
     # Number of candles the strategy requires before producing valid signals
-    startup_candle_count: int = 30
+    startup_candle_count: int = 100
 
     # Optional order type mapping.
     order_types = {
@@ -339,35 +335,11 @@ class BBandsStrategy(IStrategy):
         """
 
         # My custom indicators
-        pars = self.pars
-        # print('pars:', pars)
-        krnn = floor(pars['krn'] * 60)
-        krx = np.linspace(pars['krstart'], pars['krend'], krnn)
-        kry = krx
-        kry = np.tan(kry)
-        kry = np.sin(kry)
-        kry = np.power(kry , pars['krpow'])
-        if pars['krflip']: kry = np.flipud(kry)
-        if pars['krflipy']: kry = -(kry)
-        kry = kry - np.mean(kry)
-        
-        # kry = kry * 100
-        # kry = kry - kry.mean
-
-        dataframe['lret'] = dataframe.close.apply(np.log).diff(1).fillna(0)
-        dataframe['cumlret'] = dataframe.lret.cumsum()
-
-        dataframe['bb_middle'] = dataframe.close.ewm(span=pars['bbma'],min_periods=0,adjust=False,ignore_na=False).mean()
-        dataframe['bb_std'] = dataframe.close.rolling(pars['bbstn']).std()
-        dataframe['bb_std_bw'] = dataframe.bb_std * pars['bbstd']
+        dataframe['bb_middle'] = dataframe.close.ewm(span=self.bbma.value,min_periods=0,adjust=False,ignore_na=False).mean()
+        dataframe['bb_std'] = dataframe.close.rolling(self.bbstn.value).std()
+        dataframe['bb_std_bw'] = dataframe.bb_std * self.bbstd.value
         dataframe['bb_lower'] = dataframe['bb_middle'] - dataframe.bb_std_bw
 
-        # wdf['conv1'] = wdf.cumlret.rolling(krnn).apply(lambda v: (v * kry).sum())
-        conv1 = np.convolve(dataframe.cumlret, kry, mode='same')
-        ncut = floor(len(kry)/2)
-        conv1[:ncut] = 0
-        conv1[-ncut:] = 0
-        dataframe['conv1'] = conv1
 
         return dataframe
 
@@ -378,18 +350,15 @@ class BBandsStrategy(IStrategy):
         :param metadata: Additional information, like the currently traded pair
         :return: DataFrame with buy column
         """
-        dataframe.loc[
-            (
 
-                (dataframe.close < dataframe.bb_lower) &
-                (dataframe.conv1 >= self.pars['cnv'][0]) &
-                (dataframe.conv1 <= self.pars['cnv'][1])
-                # # Signal: RSI crosses above 30
-                # (qtpylib.crossed_above(dataframe['rsi'], self.buy_rsi.value)) &
-                # (dataframe['tema'] <= dataframe['bb_middleband']) &  # Guard: tema below BB middle
-                # (dataframe['tema'] > dataframe['tema'].shift(1)) &  # Guard: tema is raising
-                # (dataframe['volume'] > 0)  # Make sure Volume is not 0
-            ),
+        buy_cond = (
+                (dataframe.close <= dataframe.bb_lower) 
+            )
+
+        dataframe['buy_sig'] = (buy_cond & ((~buy_cond).shift(fill_value=False)))
+        
+        dataframe.loc[
+            dataframe['buy_sig'],
             'buy'] = 1
 
         return dataframe
@@ -403,11 +372,15 @@ class BBandsStrategy(IStrategy):
         """
         # dataframe.loc[
         #     (
-                # Signal: RSI crosses above 70
-                # (qtpylib.crossed_above(dataframe['rsi'], self.sell_rsi.value)) &
-                # (dataframe['tema'] > dataframe['bb_middleband']) &  # Guard: tema above BB middle
-                # (dataframe['tema'] < dataframe['tema'].shift(1)) &  # Guard: tema is falling
-                # (dataframe['volume'] > 0)  # Make sure Volume is not 0
-            # ),
-            # 'sell'] = 1
+        #         Signal: RSI crosses above 70
+        #         (qtpylib.crossed_above(dataframe['rsi'], self.sell_rsi.value)) &
+        #         (dataframe['tema'] > dataframe['bb_middleband']) &  # Guard: tema above BB middle
+        #         (dataframe['tema'] < dataframe['tema'].shift(1)) &  # Guard: tema is falling
+        #         (dataframe['volume'] > 0)  # Make sure Volume is not 0
+        #     ),
+        #     'sell'] = 1
+        # dataframe['sell'] = 1
+
+        dataframe['sell'] = 0
+    
         return dataframe
