@@ -15,6 +15,13 @@ import talib.abstract as ta
 import freqtrade.vendor.qtpylib.indicators as qtpylib
 
 from math import *
+import json
+
+ijsconf = False
+with open('strat-params-bbands-convol.json') as f: 
+    ijsconf = json.loads(f.read());
+
+print("ijsconf: ", ijsconf)
 
 # This class is a sample. Feel free to customize it.
 class BBandsStrategy(IStrategy):
@@ -41,11 +48,12 @@ class BBandsStrategy(IStrategy):
 
     # ROI table:
     minimal_roi = {
-        "0": 0.02,
+        "0": ijsconf['takeprofit'],
+        "1": ijsconf['takeprofit'],
     }
 
     # Stoploss:
-    stoploss = -0.02
+    stoploss = ijsconf['stoploss']
 
     # Trailing stop:
     # trailing_stop = True
@@ -53,24 +61,24 @@ class BBandsStrategy(IStrategy):
     # trailing_stop_positive_offset = 0.232
     # trailing_only_offset_is_reached = False
 
-    bbma = IntParameter(low=3, high=300, default=50, space='buy', optimize=True, load=True)
-    bbstn = IntParameter(low=3, high=300, default=26, space='buy', optimize=True, load=True)
-    bbstd = DecimalParameter(low=0, high=3, default=2, space='buy', optimize=True, load=True)
-    takeprofit = DecimalParameter(low=0.005, high=0.05, default=0.02, space='buy', optimize=True, load=True)
+    bbma = IntParameter(low=3, high=300, default=ijsconf['bbma'], space='buy', optimize=True, load=True)
+    bbstn = IntParameter(low=3, high=300, default=ijsconf['bbstn'], space='buy', optimize=True, load=True)
+    bbstd = DecimalParameter(low=0, high=3, default=ijsconf['bbstd'], space='buy', optimize=True, load=True)
+    # takeprofit = DecimalParameter(low=0.005, high=0.05, default=0.02, space='sell', optimize=True, load=True)
 
     # Optimal timeframe for the strategy.
-    timeframe = '1m'
+    timeframe = '5m'
 
     # Run "populate_indicators()" only for new candle.
-    process_only_new_candles = False
+    process_only_new_candles = True
 
     # These values can be overridden in the "ask_strategy" section in the config.
-    use_sell_signal = False
-    sell_profit_only = False
-    ignore_roi_if_buy_signal = False
+    use_sell_signal = True
+    # sell_profit_only = False
+    # ignore_roi_if_buy_signal = False
 
     # Number of candles the strategy requires before producing valid signals
-    startup_candle_count: int = 100
+    startup_candle_count: int = max(ijsconf['bbma'], ijsconf['bbstn'])
 
     # Optional order type mapping.
     order_types = {
@@ -352,15 +360,17 @@ class BBandsStrategy(IStrategy):
         """
 
         buy_cond = (
-                (dataframe.close <= dataframe.bb_lower) 
+                (dataframe.open <= dataframe.bb_lower) 
             )
+        # buy_cond = buy_cond.shift(fill_value=False)
 
-        dataframe['buy_sig'] = (buy_cond & ((~buy_cond).shift(fill_value=False)))
+        # buy_sig = (buy_cond & ((~buy_cond).shift(fill_value=False)))
         
         dataframe.loc[
-            dataframe['buy_sig'],
+            # dataframe['buy_sig'],
+            buy_cond,
             'buy'] = 1
-
+        print('buy sig len:', len(dataframe[dataframe.buy == 1]))
         return dataframe
 
     def populate_sell_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
@@ -372,10 +382,10 @@ class BBandsStrategy(IStrategy):
         """
         # dataframe.loc[
         #     (
-        #         Signal: RSI crosses above 70
-        #         (qtpylib.crossed_above(dataframe['rsi'], self.sell_rsi.value)) &
-        #         (dataframe['tema'] > dataframe['bb_middleband']) &  # Guard: tema above BB middle
-        #         (dataframe['tema'] < dataframe['tema'].shift(1)) &  # Guard: tema is falling
+        #         # Signal: RSI crosses above 70
+        #         # (qtpylib.crossed_above(dataframe['rsi'], self.sell_rsi.value)) &
+        #         # (dataframe['tema'] > dataframe['bb_middleband']) &  # Guard: tema above BB middle
+        #         # (dataframe['tema'] < dataframe['tema'].shift(1)) &  # Guard: tema is falling
         #         (dataframe['volume'] > 0)  # Make sure Volume is not 0
         #     ),
         #     'sell'] = 1

@@ -25,7 +25,7 @@ freqtrade backtesting --datadir user_data/data/binance  --export trades --stake-
 
 freqtrade download-data --userdir freq-user-data --exchange binance -t 1h --timerange 20190101- -p BTC/USDT
 
-freqtrade download-data --userdir freq-user-data --exchange binance -t 1m --timerange 20200901- -p BTC/USDT
+freqtrade download-data --userdir freq-user-data --exchange binance -t 1m --timerange 20200901- -p ETH/USDT
 
 -----------------
 freqtrade download-data --exchange binance --timerange 20100101- -t 12h 8h 1d -p ALGO/USDT AVAX/USDT ADA/USDT ATOM/USDT BAL/USDT BCH/USDT BNB/USDT BTC/USDT COMP/USDT DASH/USDT DOGE/USDT DOT/USDT EGLD/USDT ENJ/USDT EOS/USDT ETH/USDT FIL/USDT FTT/USDT KSM/USDT LINK/USDT LRC/USDT LTC/USDT LUNA/USDT MATIC/USDT REEF/USDT REN/USDT RUNE/USDT SOL/USDT THETA/USDT TRX/USDT UNI/USDT VET/USDT XLM/USDT XRP/USDT
@@ -33,7 +33,7 @@ freqtrade download-data --exchange binance --timerange 20100101- -t 12h 8h 1d -p
 freqtrade download-data --exchange binance -t 1d 8h 12h 4h 2h 1h 15m -p ALGO/BTC AVAX/BTC ADA/BTC ATOM/BTC BAL/BTC BCH/BTC BNB/BTC COMP/BTC DASH/BTC DOGE/BTC DOT/BTC EGLD/BTC ENJ/BTC EOS/BTC ETH/BTC FIL/BTC FTT/BTC KSM/BTC LINK/BTC LRC/BTC LTC/BTC LUNA/BTC MATIC/BTC REEF/BTC REN/BTC RUNE/BTC SOL/BTC THETA/BTC TRX/BTC UNI/BTC VET/BTC XLM/BTC XRP/BTC
 -----------------
 
-freqtrade backtesting -c freqtrade-config.json --userdir freq-user-data --strategy BBandsStrategy --timeframe 1m --fee 0.001  --timerange 20210501-
+
 
 
 freqtrade backtesting --datadir user_data/data/binance  --export trades --stake-amount 100 -s PKBStrategy -i 5m --fee 0.001 --timerange 20200101-
@@ -49,7 +49,9 @@ open user_data/plot/freqtrade-plot-BTC_USDT-5m.html
 
 open user_data/plot/freqtrade-plot-ALGO_BTC-5m.html 
 
-
+freqtrade backtesting -c freqtrade-config.json --userdir freq-user-data --strategy BBandsStrategy --timeframe 1m --timerange 1623118200-1623148860
+freqtrade plot-dataframe  -c freqtrade-config.json -s BBandsStrategy --timerange 1621344120-1621351740
+freqtrade plot-profit  -c freqtrade-config.json -s BBandsStrategy --timerange 1621344120-1621351740
 
 freqtrade hyperopt --hyperopt-loss SharpeHyperOptLossDaily --spaces roi buy --strategy BBandsStrategy --config freqtrade-config.json  --timerange 20210705-20210715 -e 100
 

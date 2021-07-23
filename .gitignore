@@ -12,3 +12,7 @@ usr/
 user_data
 kucoin.config.json
 key.enc
+**/backtest_results
+**/hyperopt_results
+**/plot
+*.lock
