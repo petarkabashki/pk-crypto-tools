@@ -1,1 +1,1 @@
-{"w2log": 10, "w": 1, "bbma": 50, "bbstn": 50, "bbstd": -1.0, "bbpercent": 3.0, "bbwidth": 3.0, "adxn": 50, "adxtr": -100, "adxdiff": -38, "adxmp": 2, "adxmn": 30, "wdelta": 3.5}
+{"w2log": 10, "w": 76, "stoploss": -0.02, "takeprofit": 0.02, "bbma": 30, "bbstn": 30, "bbstd": 1.1, "adxn": 38, "adxtr": -100.0, "adxdiff": -1.5, "adxmp": 19.5, "adxmn": 21.0}

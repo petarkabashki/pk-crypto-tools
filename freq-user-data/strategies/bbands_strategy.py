@@ -11,7 +11,9 @@ from freqtrade.strategy import CategoricalParameter, DecimalParameter, IntParame
 
 # --------------------------------
 # Add your lib to import here
-import talib.abstract as ta
+# import talib.abstract as ta
+import pandas_ta as ta
+
 import freqtrade.vendor.qtpylib.indicators as qtpylib
 
 from math import *
@@ -64,6 +66,13 @@ class BBandsStrategy(IStrategy):
     bbma = IntParameter(low=3, high=300, default=ijsconf['bbma'], space='buy', optimize=True, load=True)
     bbstn = IntParameter(low=3, high=300, default=ijsconf['bbstn'], space='buy', optimize=True, load=True)
     bbstd = DecimalParameter(low=0, high=3, default=ijsconf['bbstd'], space='buy', optimize=True, load=True)
+
+
+    adxn = IntParameter(low=3, high=300, default=ijsconf['adxn'], space='buy', optimize=True, load=True)
+    adxtr = DecimalParameter(low=0, high=3, default=ijsconf['adxtr'], space='buy', optimize=True, load=True)
+    adxdiff = DecimalParameter(low=0, high=3, default=ijsconf['adxdiff'], space='buy', optimize=True, load=True)
+    adxmp = DecimalParameter(low=0, high=3, default=ijsconf['adxmp'], space='buy', optimize=True, load=True)
+    adxmn = DecimalParameter(low=0, high=3, default=ijsconf['adxmn'], space='buy', optimize=True, load=True)
     # takeprofit = DecimalParameter(low=0.005, high=0.05, default=0.02, space='sell', optimize=True, load=True)
 
     # Optimal timeframe for the strategy.
@@ -348,6 +357,22 @@ class BBandsStrategy(IStrategy):
         dataframe['bb_std_bw'] = dataframe.bb_std * self.bbstd.value
         dataframe['bb_lower'] = dataframe['bb_middle'] - dataframe.bb_std_bw
 
+        dataframe['bb_middle'] = dataframe.close.ewm(span=self.bbma.value,min_periods=0,adjust=False,ignore_na=False).mean()
+        dataframe['bb_std'] = dataframe.close.rolling(self.bbstn.value).std()
+        dataframe['bb_std_bw'] = dataframe.bb_std * self.bbstd.value
+        dataframe['bb_lower'] = dataframe['bb_middle'] - dataframe.bb_std_bw
+        dataframe['bb_upper'] = dataframe['bb_middle'] + dataframe.bb_std_bw
+        dataframe["bb_percent"] = (
+            (dataframe["close"] - dataframe["bb_lower"]) /
+            (dataframe["bb_upper"] - dataframe["bb_lower"])
+        )
+        dataframe["bb_width"] = (
+            (dataframe["bb_upper"] - dataframe["bb_lower"]) / dataframe["bb_middle"]
+        )
+
+        self.wadf = ta.adx(dataframe.high, dataframe.low, dataframe.close, length=self.adxn.value, lensig=None, mamode=None, scalar=None, drift=None, offset=None)
+        self.wadf.columns = ['adx','dmp','dmn']
+        self.wadf['dm_diff'] = self.wadf['dmp'].values - self.wadf['dmn'].values
 
         return dataframe
 
@@ -360,7 +385,11 @@ class BBandsStrategy(IStrategy):
         """
 
         buy_cond = (
-                (dataframe.open <= dataframe.bb_lower) 
+                (dataframe.open <= dataframe.bb_lower) &
+                (self.wadf.adx >= self.adxtr.value) & 
+                (self.wadf.dm_diff > self.adxdiff.value) & 
+                (self.wadf.dmp >= self.adxmp.value) & 
+                (self.wadf.dmn <= self.adxmn.value)
             )
         # buy_cond = buy_cond.shift(fill_value=False)
 

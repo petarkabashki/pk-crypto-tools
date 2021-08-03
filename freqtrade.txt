@@ -25,7 +25,7 @@ freqtrade backtesting --datadir user_data/data/binance  --export trades --stake-
 
 freqtrade download-data --userdir freq-user-data --exchange binance -t 1h --timerange 20190101- -p BTC/USDT
 
-freqtrade download-data --userdir freq-user-data --exchange binance -t 1m --timerange 20200901- -p ETH/USDT
+freqtrade download-data --userdir freq-user-data --exchange binance -t 1m 5m 15m --timerange 20210101- -p BTC/USDT
 
 -----------------
 freqtrade download-data --exchange binance --timerange 20100101- -t 12h 8h 1d -p ALGO/USDT AVAX/USDT ADA/USDT ATOM/USDT BAL/USDT BCH/USDT BNB/USDT BTC/USDT COMP/USDT DASH/USDT DOGE/USDT DOT/USDT EGLD/USDT ENJ/USDT EOS/USDT ETH/USDT FIL/USDT FTT/USDT KSM/USDT LINK/USDT LRC/USDT LTC/USDT LUNA/USDT MATIC/USDT REEF/USDT REN/USDT RUNE/USDT SOL/USDT THETA/USDT TRX/USDT UNI/USDT VET/USDT XLM/USDT XRP/USDT
