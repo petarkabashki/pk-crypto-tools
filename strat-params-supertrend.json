@@ -1,1 +1,1 @@
-{"w2log": 16, "w": 0, "ma1n": 17, "stdn": 16, "stdmu": -2.0, "ma2n": 21, "macdtr": 0.0, "rsin": 17, "rsitr": 40, "atrn": 60, "stmu": 3.0, "stbmu": 0.1, "sl": -0.024, "tp": 0.027, "spg": 0.001}
+{"w2log": 15, "w": 0, "ma1n": 24, "stdn": 6, "stdmu": -1.0, "ma2n": 50, "macdtr": [-0.016, 0.003], "rsin": 14, "rsitr": [50, 65], "atrn": 6, "stmu": 2.5, "stbmu": 1.2, "sl": -0.035, "tp": 0.032, "spg": 0.001, "trsl": [-0.021, 0.061]}
