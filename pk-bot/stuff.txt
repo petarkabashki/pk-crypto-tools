@@ -6,3 +6,24 @@ read -s kucoin_apiPassphrase
 vault kv put secret/pkbot/kucoin/api test=trump apiKey=$kucoin_apiKey secret=$kucoin_apiSecret passphrase=$kucoin_apiPassphrase
 
 vault kv get -field=test secret/pkbot/kucoin/api
+-----
+
+
+read -s binance_apiKey
+read -s binance_apiSecret
+vault kv put secret/pkbot/binance/api test='binance-trump' apiKey=$binance_apiKey secret=$binance_apiSecret
+
+
+vault kv get -field=test secret/pkbot/binance/api
+
+-----
+
+
+read -s ftx_apiKey
+read -s ftx_apiSecret
+vault kv put secret/pkbot/ftx/api test='ftx-trump' apiKey=$ftx_apiKey secret=$ftx_apiSecret
+
+
+vault kv get -field=test secret/pkbot/ftx/api
+
+-----

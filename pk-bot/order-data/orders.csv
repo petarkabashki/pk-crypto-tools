@@ -1,2 +1,6 @@
-id,date_entered,exchange,symbol,strategy,order,succ_order,orderId
-10,2021-08-19 14:45:04.560470,kucoin,DOT/USDT,BuyLevelOrder,"{'trigger': ticker['ask'] <= 29, 'type': 'market', 'side': 'buy', 'amount': 0.02, 'price':0.01, 'params': {}}","{'type': 'market', 'amount': order['amount'], 'side': 'sell', 'price': 0, 'params': {'stopPrice': 22.0, 'stop': 'loss'}}",611fd205a701f400065045fe
+id,date_entered,exchange,symbol,order,succ_order,orderId
+10,2021-08-19 14:45:04.560470,kucoin,DOT/USDT,"{'trigger': ticker['ask'] <= 29, 'type': 'market', 'side': 'buy', 'amount': 0.02, 'price':0.01, 'params': {}}","{'type': 'market', 'amount': order['amount'], 'side': 'sell', 'price': 0, 'params': {'stopPrice': 22.0, 'stop': 'loss'}}",611fd205a701f400065045fe
+12,2021-08-19 14:45:04.560470,binance,DOT/USDT,"{'trigger': ticker['ask'] <= 28, 'type': 'market', 'side': 'buy', 'amount': 1, 'price':ticker['ask'], 'params': {}}",,1758504533
+13,2021-08-19 14:45:04.560470,binance,DOT/USDT,"{'trigger': True, 'type': 'STOP_LOSS_LIMIT', 'amount': 1, 'side': 'sell', 'price': 21, 'params': {'stopPrice': 22.0}}",,stop-limit
+14,2021-08-19 14:45:04.560470,binance,DOT/USDT,"{'trigger': ticker['ask'] <= 28, 'type': 'market', 'side': 'buy', 'amount': 1, 'price':ticker['ask'], 'params': {}}","{'trigger': True, 'type': 'STOP_LOSS_LIMIT', 'amount': order['amount'], 'side': 'sell', 'price': 21, 'params': {'stopPrice': 22.0}}",buy-and-stop-limit
+15,2021-08-19 14:45:04.560470,binance,DOT/USDT,"{'trigger': ticker['ask'] <= 28, 'type': 'market', 'side': 'buy', 'amount': 1, 'price':ticker['ask'], 'params': {}}","{'trigger': True, 'type': 'STOP_LOSS_LIMIT', 'amount': order['amount'], 'side': 'sell', 'price': 21, 'params': {'stopPrice': 22.0}}",1759893686
