@@ -1,0 +1,8 @@
+
+read -s kucoin_apiKey
+read -s kucoin_apiSecret
+read -s kucoin_apiPassphrase
+
+vault kv put secret/pkbot/kucoin/api test=trump apiKey=$kucoin_apiKey secret=$kucoin_apiSecret passphrase=$kucoin_apiPassphrase
+
+vault kv get -field=test secret/pkbot/kucoin/api

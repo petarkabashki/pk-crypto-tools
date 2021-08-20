@@ -15,6 +15,7 @@ class BuyLevelOrder:
         # super().__init__(config)
 
     def execute(self):
+        ticker = self.ticker
         if self.ticker['ask'] <= self.order_params['trigger_price']:
             print(f'{self.__class__.__name__} triggered for pair {self.pair} with order_params {json.dumps(self.order_params)}' )
             order = self.exchange.create_market_buy_order(self.pair, self.order_params['qty'])

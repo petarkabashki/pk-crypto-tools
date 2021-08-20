@@ -1,5 +1,2 @@
-id,date_entered,exchange,pair,strategy,order_params,orderId
-10,2021-08-19 14:45:04.560470,KUCOIN,DOT/USDT,BuyLevelOrder,"{""trigger_price"": 25.26, ""qty"": 0.02}",611e8ca17c11c70006467875
-11,2021-08-19 14:45:05.560470,KUCOIN,BTC/USDT,BuyLevelOrder,"{""trigger_price"": 40000, ""qty"": 0.001}",asdf
-2,2021-08-19 14:45:06.560470,KUCOIN,DOT/USDT,BuyLevelOrder,"{""trigger_price"": 25, ""qty"": 0.01}",asdf
-3,2021-08-19 14:45:07.560470,KUCOIN,BTC/USDT,BuyLevelOrder,"{""trigger_price"": 40000, ""qty"": 0.001}",asdf
+id,date_entered,exchange,symbol,strategy,order,succ_order,orderId
+10,2021-08-19 14:45:04.560470,kucoin,DOT/USDT,BuyLevelOrder,"{'trigger': ticker['ask'] <= 29, 'type': 'market', 'side': 'buy', 'amount': 0.02, 'price':0.01, 'params': {}}","{'type': 'market', 'amount': order['amount'], 'side': 'sell', 'price': 0, 'params': {'stopPrice': 22.0, 'stop': 'loss'}}",611fd205a701f400065045fe

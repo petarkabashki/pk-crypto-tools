@@ -1,0 +1,20 @@
+{
+    "exchanges": {
+        "binance": {
+            "enabled": false,
+            "cred": {
+                "apiKey": "config.KUCOIN_API_KEY,",
+                "secret": "config.KUCOIN_SECRET_KEY",
+                "password": "config.KUCOIN_API_PASSPHRASE"
+            } 
+        },
+        "kucoin": {
+            "enabled": true,
+            "cred": {
+                "apiKey": "$kucoin_apiKey",
+                "secret": "$kucoin_apiSecret",
+                "password": "$kucoin_apiPassphrase"
+            }
+        }
+    }
+} 
