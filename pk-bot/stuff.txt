@@ -27,3 +27,16 @@ vault kv put secret/pkbot/ftx/api test='ftx-trump' apiKey=$ftx_apiKey secret=$ft
 vault kv get -field=test secret/pkbot/ftx/api
 
 -----
+
+start vault server: 
+vault server -config ./vault/config.hcl
+
+-----
+unseal vault:
+vault operator unseal
+
+-----
+
+
+-----
+-----
