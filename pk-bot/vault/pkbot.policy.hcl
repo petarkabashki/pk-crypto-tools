@@ -1,3 +1,3 @@
-path "secret/data/pkbot/*" {
+path "secret/data/*" {
   capabilities = ["create", "update", "read", "delete"]
 }

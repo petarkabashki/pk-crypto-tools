@@ -14,6 +14,11 @@ global.tickers = {};
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+// function roundit(x, decimals) {
+//     z = Math.pow(10, decimals);
+//     return 
+// }
+
 (async () => {
 
     // const dateFormat = require('dateformat')
@@ -61,7 +66,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     setInterval(async () => {
 
         const liveOrdersCursor = await orders.aggregate([{
-            $match: { status: "live" }
+            $match: { type: "buyBelow", status: "live" }
         }]);
         const liveOrders = await liveOrdersCursor.toArray();
 
@@ -87,15 +92,19 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     setInterval(async () => {
 
         const boughtOrdersCursor = await orders.aggregate([{
-            $match: { status: "bought" }
+            $match: { type: "buyBelow", status: "bought" }
         }]);
         const boughtOrders = await boughtOrdersCursor.toArray();
 
         console.log(dateFormat())
         boughtOrders.forEach(async order => {
+            
             amount = Number(order.buyResp.executedQty);
+            // decimals = order.stop.toString().split('.')[1].length
             console.log(`   Setting stop: ${order.id} /  ${amount}  ${order.symbol} @ ${order.stop}`);
-            orderResp = await binance.sell(order.symbol, amount, (order.stop * 0.99), {stopPrice: order.stop, type: "STOP_LOSS_LIMIT"});
+            orderResp = await binance.sell(order.symbol, amount, 
+                (order.stop * 0.99).toFixed(order.stop.toString().split('.')[1].length), 
+                {stopPrice: order.stop, type: "STOP_LOSS_LIMIT"});
 
             const updRes = await orders.updateOne({ _id: order._id }, { $set: {
                 status: "stopset",
