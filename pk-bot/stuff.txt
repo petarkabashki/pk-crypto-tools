@@ -1,4 +1,10 @@
 
+read -s VAULT_ADDR
+    http://127.0.0.1:8200
+
+read -s VAULT_TOKEN
+
+-----
 read -s kucoin_apiKey
 read -s kucoin_apiSecret
 read -s kucoin_apiPassphrase
@@ -7,8 +13,6 @@ vault kv put secret/pkbot/kucoin/api test=trump apiKey=$kucoin_apiKey secret=$ku
 
 vault kv get -field=test secret/pkbot/kucoin/api
 -----
-
-
 read -s binance_apiKey
 read -s binance_apiSecret
 vault kv put secret/pkbot/binance/api test='binance-trump' apiKey=$binance_apiKey secret=$binance_apiSecret
@@ -17,8 +21,6 @@ vault kv put secret/pkbot/binance/api test='binance-trump' apiKey=$binance_apiKe
 vault kv get -field=test secret/pkbot/binance/api
 
 -----
-
-
 read -s ftx_apiKey
 read -s ftx_apiSecret
 vault kv put secret/pkbot/ftx/api test='ftx-trump' apiKey=$ftx_apiKey secret=$ftx_apiSecret
@@ -27,9 +29,13 @@ vault kv put secret/pkbot/ftx/api test='ftx-trump' apiKey=$ftx_apiKey secret=$ft
 vault kv get -field=test secret/pkbot/ftx/api
 
 -----
-
 start vault server: 
-vault server -config ./vault/config.hcl
+vault server -config ./config.hcl
+
+vault operator init
+-----
+vault ui:
+http://127.0.0.1:8200/ui
 
 -----
 unseal vault:
@@ -37,6 +43,34 @@ vault operator unseal
 
 -----
 
+vault policy write pkbot-policy ./vault/pkbot.policy.hcl
 
+export VAULT_TOKEN="$(vault token create -field token -policy=pkbot-policy)"
+
+echo $VAULT_TOKEN | xclip -sel c -i
+-----
+
+kill vault server: 
+ps aux | grep "vault server" | grep -v grep | awk '{print $2}' | xargs kill
+
+
+
+-----
+-----
+-----
+-----
+-----
+-----
+-----
+-----
+-----
+-----
+-----
+-----
+-----
+-----
+-----
+-----
+-----
 -----
 -----
