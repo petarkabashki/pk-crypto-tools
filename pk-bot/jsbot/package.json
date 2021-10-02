@@ -13,7 +13,6 @@
     "binance-api-node": "^0.11.21",
     "dateformat": "^5.0.1",
     "dotenv": "^10.0.0",
-    "mongodb": "^4.1.2",
-    "node-binance-api": "^0.13.0"
+    "mongodb": "^4.1.2"
   }
 }
