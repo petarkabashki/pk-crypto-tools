@@ -5,28 +5,45 @@ const { MongoClient } = require("mongodb");
 
 const Binance = require('binance-api-node').default
 
+
+const storeData = (data, path) => {
+    try {
+        fs.writeFileSync(path, JSON.stringify(data))
+    } catch (err) {
+        console.error(err)
+    }
+}
+const loadData = (path) => {
+    try {
+        return fs.readFileSync(path, 'utf8')
+    } catch (err) {
+        console.error(err)
+        return false
+    }
+}
+
 const xchClient = Binance({
   apiKey: process.env.BINANCE_API_KEY,
   apiSecret:  process.env.BINANCE_API_SECRET,
 //   getTime: xxx,
 })
 
-global.dbSymbols = [];
+// global.dbSymbols = [];
 global.tickers = {};
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// function roundit(x, decimals) {
-//     z = Math.pow(10, decimals);
-//     return 
-// }
-const qtyDecimals = {
-    'ATOMUSDT' : 2,
-    'LUNAUSDT' : 2,
-    'EGLDUSDT': 2
-};
 
 (async () => {
+
+    global.xchInfo = await xchClient.exchangeInfo();
+    global.xchSymbols = Object.fromEntries(global.xchInfo.symbols.map(s => [s.symbol, {...s, ...{filters: Object.fromEntries(s.filters.map(f => [f.filterType, f])) }}]));
+    // console.log(xchInfo);
+    // storeData(global.xchInfo, './binance-exchangeInfo.json');
+
+    // xchSymbols = Object.fromEntries(exchinfo.symbols.map(s => [s.symbol, s]))
+
+
 
     // const dateFormat = require('dateformat')
     const dateFormatModule = await import('dateformat')
@@ -35,21 +52,6 @@ const qtyDecimals = {
 
     // dateFormat(new Date(), "yyyy-mm-dd h:MM:ss");
 
-    // const storeData = (data, path) => {
-    //     try {
-    //         fs.writeFileSync(path, JSON.stringify(data))
-    //     } catch (err) {
-    //         console.error(err)
-    //     }
-    // }
-    // const loadData = (path) => {
-    //     try {
-    //         return fs.readFileSync(path, 'utf8')
-    //     } catch (err) {
-    //         console.error(err)
-    //         return false
-    //     }
-    // }
 
 
 
@@ -60,28 +62,56 @@ const qtyDecimals = {
     db = mongoClient.db('jsbot');
     orders = db.collection('orders')
 
-    const dbSymbolsCursor = await orders.aggregate([
-        {
-            $group: {
-                _id: null,
-                symbols: {
-                  $push: '$symbol'
-                }
-              }
-        }
-    ]);
+    const symbols = await orders.distinct('symbol');
+    // const dbSymbolsCursor = await orders.aggregate([
+    //     {
+    //         $group: {
+    //             _id: null,
+    //             symbols: {
+    //               $push: '$symbol'
+    //             }
+    //           }
+    //     }
+    // ]);
 
-    if(await dbSymbolsCursor.hasNext()) {
-        global.dbSymbols = (await dbSymbolsCursor.next()).symbols;
-        console.log(global.dbSymbols);
-    }
+    // if(await dbSymbolsCursor.hasNext()) {
+    //     global.dbSymbols = (await dbSymbolsCursor.next()).symbols;
+    //     console.log(global.dbSymbols);
+    // }
 
-    dbSymbolsCursor.close()
+    // dbSymbolsCursor.close()
 
-    xchClient.ws.miniTicker(global.dbSymbols, ticker => {
+    xchClient.ws.miniTicker(symbols, ticker => {
         global.tickers[ticker.symbol] = ticker;
     })
-  
+
+    truncQty = (symbol, qty) => {
+        const symbolInfo = global.xchSymbols[symbol];
+        const stepSize = Number(symbolInfo.filters['LOT_SIZE'].stepSize);
+        return (Math.floor(Number(qty) / stepSize) * stepSize).toFixed(symbolInfo.baseAssetPrecision);
+    } 
+
+    
+    // function calcNetQty(orderResp) {
+
+    //     // const buyCommission = orderResp.fills.reduce( (a,x) => a + Number(x.commission), 0.0);
+    //     // const totalPaid = orderResp.fills.reduce( (a,x) => a + Number(x.qty) * Number(x.price), 0);
+    //     // const qty = orderResp.fills.reduce( (a,x) => a + Number(x.qty), 0.0);
+    //     // // const netQty = (Number(qty) - Number(buyCommission)).toFixed(8);
+    //     // const netQty = (Number(qty)*0.999).toFixed(4);
+    //     // const avgBuyPrice = (totalPaid / qty).toFixed(4);
+    //     // const netAvgBuyPrice = (Number(totalPaid) / Number(netQty)).toFixed(4);
+    //     // const pnl = ((ticker.close - avgBuyPrice) / ticker.close * 100).toFixed(2);
+    //     const qty = orderResp.
+
+    //     return {
+    //         qty,
+    //         netQty,
+    //         netAvgBuyPrice,
+    //         avgBuyPrice,
+    //         buyCommission,
+    //     };
+    // }
 
 // BUY IF PRICE BELOW TRIGGER
     setInterval(async () => {
@@ -101,28 +131,22 @@ const qtyDecimals = {
                         (order.status === 'buy')  ||
                         (order.status == 'buyat' && ticker.curDayClose <= order.trigger)
                     
-                    ) {                    const amount = order.qty || (Number(order.size) / ticker.curDayClose).toFixed(qtyDecimals[order.symbol]); 
-                      const orderResp = await xchClient.order({
+                    ) {                    
+                        const amount = truncQty(order.symbol, order.qty || (order.size / ticker.curDayClose)); 
+                        console.log(`   Buying: ${order.id} /  ${amount})  ${order.symbol} @ ${ticker.curDayClose}`);
+                        const buyResp = await xchClient.order({
                         symbol: order.symbol,
                         side: 'BUY',
                         type: 'MARKET',
                         quantity: amount
-                      });
+                        });
 
-                    const buyCommission = orderResp.fills.reduce( (a,x) => a + Number(x.commission), 0);
-                    const totalPaid = orderResp.fills.reduce( (a,x) => a + Number(x.qty) * x.price, 0);
-                    const qty = orderResp.fills.reduce( (a,x) => a + Number(x.qty), 0);
-                    const avgBuyPrice = (totalPaid / qty).toFixed(qtyDecimals[order.symbol])
-
-                    const updRes = await orders.updateOne({ _id: order._id }, { $set: {
-                        status: "setstop",
-                        qty,
-                        avgBuyPrice,
-                        buyResp: orderResp,
-                        buyCommission,
-                        qty,
-
-                    }});
+                        const updRes = await orders.updateOne({ _id: order._id }, { $set: {
+                            status: "setstop",
+                            buyResp: buyResp,
+                            qty: truncQty(order.symbol, buyResp.executedQty * 0.999)
+                            // ...calcNetQty(orderResp)
+                        }});
                 }
             } catch(err) {
                 console.error(`ERROR: ${order.id} / ${err.message}`);
@@ -145,7 +169,7 @@ const qtyDecimals = {
         console.log(dateFormat())
         boughtOrders.forEach(async order => {
             try {
-                decimals = order.trigger.toString().split('.')[1].length
+                // decimals = order.trigger.toString().split('.')[1].length
 
                 if (order.stopResp && order.stopResp.orderId) { 
                     try {
@@ -159,12 +183,12 @@ const qtyDecimals = {
                     }
                 }
 
-                console.log(`   Setting stop: ${order.id} /  ${order.qty}  ${order.symbol} @ ${order.stop}`);
+                console.log(`   Setting stop: ${order.id} /  ${order.buyResp.executedQty})  ${order.symbol} @ ${order.stop}`);
                 orderResp = await xchClient.order({
                     symbol: order.symbol,
                     side: 'SELL',
                     type: 'STOP_LOSS_LIMIT',
-                    price: (order.stop * 0.99).toFixed(decimals),
+                    price: order.stop,
                     stopPrice: order.stop,
                     quantity: order.qty
                   });
@@ -240,45 +264,37 @@ const qtyDecimals = {
         });
     }, 1000);
 
-
-    // UPDATE position pnl
-    setInterval(async () => {
+    // // UPDATE position pnl
+    // setInterval(async () => {
             
-        const boughtOrdersCursor = await orders.aggregate([{
-            $match: { status: {$in: ['sell', 'sellat', 'sold']} }
-        }]);
-        const boughtOrders = await boughtOrdersCursor.toArray();
+    //     const boughtOrdersCursor = await orders.find({
+    //         qty: null,
+    //         buyResp: { $exists : true },
+    //         // $match: { status: {$in: ['sell', 'sellat', 'sold', '']} }
+    //     });
+    //     const boughtOrders = await boughtOrdersCursor.toArray();
 
-        console.log(dateFormat())
-        boughtOrders.forEach(async order => {
-            try {
-                ticker = global.tickers[order.symbol]
-                if (!ticker || !order.orderResp) return;
+    //     console.log(dateFormat())
+    //     boughtOrders.forEach(async order => {
+    //         // if (order.qty) {
+    //         //     return;
+    //         // }
+    //         try {
+    //             // ticker = global.tickers[order.symbol]
+    //             // if (!ticker || !order.orderResp) return;
 
-                orderResp = order.orderResp;
-
-                const buyCommission = orderResp.fills.reduce( (a,x) => a + x.commission, 0);
-                const totalPaid = orderResp.fills.reduce( (a,x) => a + x.qty * x.price, 0);
-                const qty = orderResp.fills.reduce( (a,x) => a + x.qty, 0);
-                const avgBuyPrice = (totalPaid / qty).toFixed(qtyDecimals[order.symbol]);
-                const pnl = ((ticker.close - avgBuyPrice) / ticker.close * 100).toFixed(2);
-
-                const updRes = await orders.updateOne({ _id: order._id }, { $set: {
-                    avgBuyPrice,
-                    buyResp: orderResp,
-                    buyCommission,
-                    qty,
-                    pnl
-
-                }});
-            } catch(err) {
-                console.error(`ERROR: ${order.id} / ${err.message}`);
-            }
-        });
-    }, 1000);
+    //             const updRes = await orders.updateOne({ _id: order._id }, { $set: {
+    //                 ...calcNetQty(order.buyResp)
+    //             }});
+    //         } catch(err) {
+    //             console.error(`ERROR: ${order.id} / ${err.message}`);
+    //         }
+    //     });
+    // }, 1000);
 
 
 })();
+
 
 
 // [
