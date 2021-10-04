@@ -92,26 +92,27 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     } 
 
     
-    // function calcNetQty(orderResp) {
+    function calcAvgPrice(order) {
+        const ticker = global.tickers[order.symbol];
+        const orderResp = order.buyResp;
+        const buyCommission = orderResp.fills.reduce( (a,x) => a + Number(x.commission), 0.0);
+        const totalPaid = orderResp.fills.reduce( (a,x) => a + Number(x.qty) * Number(x.price), 0);
+        // const qty = orderResp.fills.reduce( (a,x) => a + Number(x.qty), 0.0);
+        const netQty = (Number(order.qty) - Number(buyCommission));
+        const avgBuyPrice = (totalPaid / Number(order.qty));
+        const netAvgBuyPrice = (totalPaid / netQty);
+        const posPnl = (ticker.curDayClose - avgBuyPrice) * Number(order.qty);
+        const posPnlPercent = ((ticker.curDayClose - avgBuyPrice) / avgBuyPrice * 100).toFixed(4);
 
-    //     // const buyCommission = orderResp.fills.reduce( (a,x) => a + Number(x.commission), 0.0);
-    //     // const totalPaid = orderResp.fills.reduce( (a,x) => a + Number(x.qty) * Number(x.price), 0);
-    //     // const qty = orderResp.fills.reduce( (a,x) => a + Number(x.qty), 0.0);
-    //     // // const netQty = (Number(qty) - Number(buyCommission)).toFixed(8);
-    //     // const netQty = (Number(qty)*0.999).toFixed(4);
-    //     // const avgBuyPrice = (totalPaid / qty).toFixed(4);
-    //     // const netAvgBuyPrice = (Number(totalPaid) / Number(netQty)).toFixed(4);
-    //     // const pnl = ((ticker.close - avgBuyPrice) / ticker.close * 100).toFixed(2);
-    //     const qty = orderResp.
-
-    //     return {
-    //         qty,
-    //         netQty,
-    //         netAvgBuyPrice,
-    //         avgBuyPrice,
-    //         buyCommission,
-    //     };
-    // }
+        return {
+            netQty,
+            netAvgBuyPrice,
+            avgBuyPrice,
+            buyCommission,
+            posPnl,
+            posPnlPercent
+        };
+    }
 
 // BUY IF PRICE BELOW TRIGGER
     setInterval(async () => {
@@ -121,7 +122,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
         }]);
         const liveOrders = await liveOrdersCursor.toArray();
 
-        console.log(dateFormat())
+        console.log(dateFormat(), 'Checking buy levels...')
         liveOrders.forEach(async order => {
             try {
                 ticker = global.tickers[order.symbol]
@@ -142,7 +143,8 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
                         });
 
                         const updRes = await orders.updateOne({ _id: order._id }, { $set: {
-                            status: "setstop",
+                            status: "sellat",
+                            action: "setstop",
                             buyResp: buyResp,
                             qty: truncQty(order.symbol, buyResp.executedQty * 0.999)
                             // ...calcNetQty(orderResp)
@@ -162,18 +164,18 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     setInterval(async () => {
 
         const boughtOrdersCursor = await orders.aggregate([{
-            $match: { status: "setstop" }
+            $match: { action: "setstop" }
         }]);
         const boughtOrders = await boughtOrdersCursor.toArray();
 
-        console.log(dateFormat())
+        console.log(dateFormat(), 'Setting stops...')
         boughtOrders.forEach(async order => {
             try {
                 // decimals = order.trigger.toString().split('.')[1].length
 
                 if (order.stopResp && order.stopResp.orderId) { 
                     try {
-                        console.log(`       Canceling previous stop order :  ${order.stopResp.orderId}`);
+                        console.log(`   Canceling previous stop order :  ${order.stopResp.orderId}`);
                         const cancelStopResp = await xchClient.cancelOrder({ symbol: order.symbol, orderId: order.stopResp.orderId });        
                         const updRes = await orders.updateOne({ _id: order._id }, { $set: {
                             cancelStopResp: cancelStopResp,
@@ -194,19 +196,20 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
                   });
 
                 const updRes = await orders.updateOne({ _id: order._id }, { $set: {
-                    status: "sellat",
+                    // status: "sellat",
+                    action: "",
                     stopResp: orderResp
                 }});
             } catch(err) {
                 console.error(`ERROR: ${order.id} / ${err.message}`);
                 await orders.updateOne({ _id: order._id }, { $set: {
-                    status: "err",
+                    // status: "err",
                     error: err.message
                 }});
             }
         
         });
-    }, 1000);
+    }, 3000);
 
 // SELL
     setInterval(async () => {
@@ -216,7 +219,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
         }]);
         const boughtOrders = await boughtOrdersCursor.toArray();
 
-        console.log(dateFormat())
+        console.log(dateFormat(), 'Checking sell targets...')
         boughtOrders.forEach(async order => {
             try {
                 ticker = global.tickers[order.symbol]
@@ -227,10 +230,10 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
                         (ticker.curDayClose >= order.target && order.status === 'sellat') 
                     ) {
 
-                    console.log(`   Target hit: ${order.id} /  ${order.qty}  ${order.symbol} @ ${order.target}`);
+                    // console.log(`   Target hit: ${order.id} /  ${order.qty}  ${order.symbol} @ ${order.target}`);
                     if (order.stopResp && order.stopResp.orderId) {
                         try {
-                            console.log(`       Canceling stop order on exchange:  ${order.stopResp.orderId}`);                            
+                            console.log(`   Canceling stop order on exchange:  ${order.stopResp.orderId}`);                            
                             const cancelStopResp = await xchClient.cancelOrder({ symbol: order.symbol, orderId: order.stopResp.orderId });            
                             const updRes = await orders.updateOne({ _id: order._id }, { $set: {
                                 cancelStopResp: cancelStopResp,
@@ -240,7 +243,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
                             console.error(`Error canceling stop order: ${order.id}`);
                         }        
                     }
-                    console.log(`       Market sell:  ${order.id} / ${order.qty} ${order.symbol}`);
+                    console.log(`   Market sell:  ${order.id} / ${order.qty} ${order.symbol} @ ${ticker.curDayClose}`);
                     const sellResp = await xchClient.order({
                         symbol: order.symbol,
                         side: 'SELL',
@@ -262,35 +265,69 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
                 }});
             }
         });
-    }, 1000);
+    }, 3000);
 
-    // // UPDATE position pnl
-    // setInterval(async () => {
+    // UPDATE position avg price & pnl
+    setInterval(async () => {
             
-    //     const boughtOrdersCursor = await orders.find({
-    //         qty: null,
-    //         buyResp: { $exists : true },
-    //         // $match: { status: {$in: ['sell', 'sellat', 'sold', '']} }
-    //     });
-    //     const boughtOrders = await boughtOrdersCursor.toArray();
+        const boughtOrdersCursor = await orders.find({
+            buyResp: { $exists : true },
+            qty: { $exists: true},
+            status: {$in: ['sell', 'sellat']} 
+        });
+        const boughtOrders = await boughtOrdersCursor.toArray();
 
-    //     console.log(dateFormat())
-    //     boughtOrders.forEach(async order => {
-    //         // if (order.qty) {
-    //         //     return;
-    //         // }
-    //         try {
-    //             // ticker = global.tickers[order.symbol]
-    //             // if (!ticker || !order.orderResp) return;
+        console.log(dateFormat(), 'Calculate Avg price and PNL');
+        boughtOrders.forEach(async order => {
+            try {
+                // ticker = global.tickers[order.symbol]
+                // if (!ticker || !order.orderResp) return;
 
-    //             const updRes = await orders.updateOne({ _id: order._id }, { $set: {
-    //                 ...calcNetQty(order.buyResp)
-    //             }});
-    //         } catch(err) {
-    //             console.error(`ERROR: ${order.id} / ${err.message}`);
-    //         }
-    //     });
-    // }, 1000);
+                const updRes = await orders.updateOne({ _id: order._id }, { $set: {
+                    ...calcAvgPrice(order)
+                }});
+            } catch(err) {
+                console.error(`ERROR: ${order.id} / ${err.message}`);
+            }
+        });
+    }, 5000);
+
+    // UPDATE stop losses
+    setInterval(async () => {
+        
+        const dbOrdersCursor = await orders.aggregate([{
+            $match: { status: {$in: ['sell', 'sellat']} }
+        }]);
+        const dbOrders = await dbOrdersCursor.toArray();
+
+        console.log(dateFormat(), "Updating stops in db...")
+        dbOrders.forEach(async order => {
+            try {
+                ticker = global.tickers[order.symbol]
+                if (!ticker > !order.stopResp) return;
+
+                stopOrderResp = await xchClient.getOrder({
+                    symbol: order.symbol,
+                    orderId: order.stopResp.orderId,
+                  });
+
+                if(stopOrderResp.status ==='FILLED') {
+                    const updRes = await orders.updateOne({ _id: order._id }, { $set: {
+                        status: "stopped",
+                        stopOrderResp: stopOrderResp
+                    }});
+                
+                }
+
+            } catch(err) {
+                console.error(`ERROR updating stop order in db: ${order.id} / ${err.message}`);
+                await orders.updateOne({ _id: order._id }, { $set: {
+                    // status: "err",
+                    error: err.message
+                }});
+            }
+        });
+    }, 3000);
 
 
 })();
