@@ -95,7 +95,8 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
         const symbolInfo = global.exchangeSymbols[symbol];
         // console.log('symbolInfo', global.exchangeSymbols)
         const stepSize = Number(symbolInfo.filters['LOT_SIZE'].stepSize);
-        return (Math.floor(Number(qty) / stepSize) * stepSize).toFixed(symbolInfo.baseAssetPrecision);
+        // symbolInfo.baseAssetPrecision
+        return (Math.floor(Number(qty) / stepSize) * stepSize);
     } 
 
     
@@ -109,12 +110,13 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
         console.log(dateFormat(), 'Checking buy levels...');
         buyDbOrders.forEach(async dbOrder => {
             try {
-                ticker = global.tickers[dbOrder.symbol]
-                console.log(`   CHECKING: ${dbOrder.id} /  ${dbOrder.size})  ${dbOrder.symbol} @ ${ticker.curDayClose}`);
+                ticker = global.tickers[dbOrder.symbol];
                 if (!ticker) {
-                    console.log(`TICKER NOT FOUND: ${symbol}`);
+                    console.log(`TICKER NOT FOUND: ${dbOrder.symbol}`);
                     return;
                 }
+                // console.log('ticker', ticker)
+                console.log(`CHECKING: ${dbOrder.id}\t${dbOrder.size}) ${dbOrder.symbol} (${ticker.curDayClose})\n\ttrigger:${dbOrder.trigger}\tstop:${dbOrder.stop}\ttarget:${dbOrder.target}`);
                 if (
                         (dbOrder.status === 'buy')  ||
                         (dbOrder.status == 'buyat' && ticker.curDayClose <= dbOrder.trigger)
@@ -132,10 +134,10 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
                         const baseAssetFreeBalance = (await client.accountInfo()).balances
                             .find(b => b.asset === global.exchangeSymbols[dbOrder.symbol].baseAsset)
                             .free;
-                        const qty = truncQty(dbOrder.symbol, Math.min(Number(buyResp.executedQty) * 0.999, baseAssetFreeBalance));
+                        const qty = truncQty(dbOrder.symbol, Math.min(Number(buyResp.executedQty) * 0.998, baseAssetFreeBalance));
 
-                        console.log('baseAssetFreeBalance', baseAssetFreeBalance)
-                        console.log('qty', qty)
+                        // console.log('baseAssetFreeBalance', baseAssetFreeBalance)
+                        // console.log('qty', qty)
 
                         stopResp = await client.order({
                             symbol: dbOrder.symbol,
@@ -171,10 +173,10 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
         console.log(dateFormat(), 'Setting stops...')
         dbOrdersCursor.forEach(async dbOrder => {
             try {
-                if (dbOrder.stopResp && dbOrder.stopResp.dbOrderId) { 
+                if (dbOrder.stopResp && dbOrder.stopResp.orderId) { 
                     try {
                         console.log(`   Canceling previous stop dbOrder :  ${dbOrder.stopResp.dbOrderId}`);
-                        const cancelStopResp = await client.cancelOrder({ symbol: dbOrder.symbol, dbOrderId: dbOrder.stopResp.dbOrderId });        
+                        const cancelStopResp = await client.cancelOrder({ symbol: dbOrder.symbol, orderId: dbOrder.stopResp.orderId });        
                         const updRes = await dbOrders.updateOne({ _id: dbOrder._id }, { $set: {
                             cancelStopResp: cancelStopResp,
                         }});        
@@ -183,6 +185,12 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
                     }
                 }
 
+                const buyResp = dbOrder.buyResp;
+
+                const baseAssetFreeBalance = (await client.accountInfo()).balances
+                    .find(b => b.asset === global.exchangeSymbols[dbOrder.symbol].baseAsset)
+                    .free;
+                const qty = truncQty(dbOrder.symbol, Math.min(Number(buyResp.executedQty) * 0.998, baseAssetFreeBalance));
 
                 console.log(`   Setting stop: ${dbOrder.id} /  ${dbOrder.qty})  ${dbOrder.symbol} @ ${dbOrder.stop}`);
                 dbOrderResp = await client.order({
@@ -191,7 +199,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
                     type: 'STOP_LOSS_LIMIT',
                     price: dbOrder.stop,
                     stopPrice: dbOrder.stop,
-                    quantity: dbOrder.qty
+                    quantity: qty
                   });
 
                 const updRes = await dbOrders.updateOne({ _id: dbOrder._id }, { $set: {
