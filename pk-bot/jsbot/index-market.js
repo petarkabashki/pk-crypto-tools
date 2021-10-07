@@ -124,6 +124,10 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
                     ) {                    
                         const amount = truncQty(dbOrder.symbol, dbOrder.qty || (dbOrder.size / ticker.curDayClose)); 
                         console.log(`   Buying: ${dbOrder.id} /  ${amount})  ${dbOrder.symbol} @ ${ticker.curDayClose}`);
+                        await dbOrders.updateOne({ _id: dbOrder._id }, { $set: {
+                            status: "buying"
+                        }});
+
                         const buyResp = await client.order({
                             symbol: dbOrder.symbol,
                             side: 'BUY',
@@ -173,6 +177,9 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
         console.log(dateFormat(), 'Setting stops...')
         dbOrdersCursor.forEach(async dbOrder => {
             try {
+                if(!dbOrder.qty) {
+                    return;
+                }
                 if (dbOrder.stopResp && dbOrder.stopResp.orderId) { 
                     try {
                         console.log(`   Canceling previous stop dbOrder :  ${dbOrder.stopResp.dbOrderId}`);
@@ -185,12 +192,12 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
                     }
                 }
 
-                const buyResp = dbOrder.buyResp;
+                // const buyResp = dbOrder.buyResp;
 
                 const baseAssetFreeBalance = (await client.accountInfo()).balances
                     .find(b => b.asset === global.exchangeSymbols[dbOrder.symbol].baseAsset)
                     .free;
-                const qty = truncQty(dbOrder.symbol, Math.min(Number(buyResp.executedQty) * 0.998, baseAssetFreeBalance));
+                const qty = truncQty(dbOrder.symbol, Math.min(Number(dbOrder.qty) * 0.998, baseAssetFreeBalance));
 
                 console.log(`   Setting stop: ${dbOrder.id} /  ${dbOrder.qty})  ${dbOrder.symbol} @ ${dbOrder.stop}`);
                 dbOrderResp = await client.order({
@@ -209,7 +216,9 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
             } catch(err) {
                 console.error(`ERROR: ${dbOrder.id} / ${err.message}`);
                 await dbOrders.updateOne({ _id: dbOrder._id }, { $set: {
-                    error: err.message
+                    error: err.message,
+                    status: "err",
+                    action: ""
                 }});
             }
         
