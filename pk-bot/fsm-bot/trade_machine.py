@@ -24,12 +24,14 @@ transitions = [
     { 'trigger': 'disable', 'source': 'LIVE', 'dest': 'DISABLED'},
     { 'trigger': 'tick', 'source': 'LIVE', 'dest': 'LONG', 'conditions': 'is_buy_signal', 'before' : ['buy_on_exchange', 'loadrec', 'set_stop_on_exchange']},
     { 'trigger': 'movestop', 'source': 'LONG', 'dest': 'LONG' ,'before': ['saverec', 'loadrec', 'remove_stop_on_exchange', 'set_stop_on_exchange']},
+    { 'trigger': 'setstop', 'source': 'LONG', 'dest': 'LONG' ,'before': ['saverec', 'loadrec', 'set_stop_on_exchange']},
     { 'trigger': 'tick', 'source': 'LONG', 'dest': 'STOPPED', 'conditions': 'is_stopped'},
     { 'trigger': 'tick', 'source': 'LONG', 'dest': 'SOLD' ,'conditions': 'is_sell_signal', 'before': ['remove_stop_on_exchange', 'sell_on_exchange']},
     { 'trigger': 'sell', 'source': 'LONG', 'dest': 'SOLD' , 'before': ['remove_stop_on_exchange', 'sell_on_exchange']},
     { 'trigger': 'update', 'source': '*', 'dest': None, 'before': 'saverec', 'after': 'loadrec'},
     { 'trigger': 'load', 'source': '*', 'dest': None, 'before': 'loadrec'},
-    { 'trigger': 'save', 'source': '*', 'dest': None, 'before': 'saverec'},
+    # { 'trigger': 'save', 'source': '*', 'dest': None, 'before': 'saverec'},
+    { 'trigger': 'delete', 'source': '*', 'dest': None, 'before': 'deleterec'},
     { 'trigger': 'insert', 'source': '*', 'dest': None, 'before': 'insertrec'},
     { 'trigger': 'attach', 'source': '*', 'dest': None, 'before': 'attachrec'}
 
@@ -45,28 +47,55 @@ class TradeModel(object):
         self.machine = Machine(self, states=states, transitions=transitions, send_event=True, initial='DISABLED', 
             after_state_change=['machine_state_changed'], on_exception='handle_error')
 
+    def __str__(self):
+        if self.rec:
+            return f"{self.rec._id} {self.state} {self.rec.symbol} {self.rec.qty}"
+        else:
+            return f"{self.state}"
+
+
+    def __unicode__(self):
+        return self.__str__()
+
+    def __repr__(self):
+        return self.__str__() 
+     
     def attachrec(self, event):
-        self.rec = DotMap(event.kwargs['data'])
+        self.rec = DotMap(event.kwargs['rec'])
         self.machine.set_state(self.rec.state)
 
         
     def loadrec(self, event):
         logging.debug(event.kwargs)
-        self.rec = DotMap(self.db.find_one({'_id': ObjectId(self._id)}))
+        self.rec = DotMap(self.db.find_one({'_id': ObjectId(self.rec._id)}))
         self.state = self.rec.state
 
 
     def saverec(self, event):
         logging.debug(event.kwargs)
         try:
-            self.db.update_one({'_id' : self._id }, event.kwargs['data'] )
+            self.db.update_one({'_id' : self.rec._id }, event.kwargs['data'] )
         except BaseException as err:
             logging.error(err)
-            self.db.update_one({'_id' : self._id }, {
+            self.db.update_one({'_id' : self.rec._id }, {
             '$set': {
                 'state': 'ERROR',
                 'err': str(err)
             }})
+
+
+    def deleterec(self, event):
+        logging.debug(f'deleting {self.rec._id} {self.rec.id}')
+        try:
+            self.db.delete_one({'_id' : self.rec._id })
+            self.unwatch()
+        except BaseException as err:
+            logging.error(err)
+            self.db.update_one({'_id' : self.rec._id }, {
+            '$set': {
+                'state': 'ERROR',
+                'err': str(err)
+            }})            
 
     def insertrec(self, event):
         logging.debug(event.kwargs)        
@@ -79,7 +108,6 @@ class TradeModel(object):
                     **data
                 })
             self.rec = DotMap(self.db.find_one({'_id': insertRes.inserted_id}))
-            self._id = insertRes.inserted_id
         except BaseException as err:
             logging.error(err)
 
@@ -112,10 +140,11 @@ class TradeModel(object):
     def buy_on_exchange(self, event):
         logging.debug(event.kwargs)
         try:
-            resp =self.exchange.create_order(self.rec.symbol, 'market', 'buy', float(self.rec.qty));
+            buyResp =self.exchange.create_order(self.rec.symbol, 'market', 'buy', float(self.rec.qty));
             self.db.update_one({'_id' : self.rec._id }, {
             '$set': {
-                'buyResp': resp
+                'buyResp': buyResp,
+                'availableQty': (buyResp['filled'] - buyResp['fee']['cost'])
             }})
         except BaseException as err:
             logging.error(err)
@@ -128,8 +157,7 @@ class TradeModel(object):
     def sell_on_exchange(self, event):
         logging.debug(event.kwargs)
         try:
-            available_qty = self.rec.buyResp['filled'] - self.rec.buyResp['fee']['cost']
-            resp =self.exchange.create_order(self.rec.symbol, 'market', 'sell', available_qty)
+            resp =self.exchange.create_order(self.rec.symbol, 'market', 'sell', self.rec['availableQty'] * 0.99)
             self.db.update_one({'_id' : self.rec._id }, {
             '$set': {
                 'sellResp': resp
@@ -145,8 +173,7 @@ class TradeModel(object):
     def set_stop_on_exchange(self, event):
         logging.debug(event.kwargs)
         try:
-            available_qty = self.rec.buyResp['filled'] - self.rec.buyResp['fee']['cost']
-            resp =self.exchange.create_order(self.rec.symbol, 'STOP_LOSS_LIMIT', 'sell', available_qty * 0.99, 
+            resp =self.exchange.create_order(self.rec.symbol, 'STOP_LOSS_LIMIT', 'sell', self.rec['availableQty'] * 0.99, 
                 0.90 * float(self.rec.stop), {'stopPrice': float(self.rec.stop),'type': 'stopLimit'})
             self.db.update_one({'_id' : self.rec._id }, {
             '$set': {
@@ -198,7 +225,7 @@ class TradeModel(object):
                 'state': 'ERROR',
                 'error': { 
                     'error': event.error,
-                    'kwargs': event.kwargs 
+                    # 'kwargs': event.kwargs 
                     }
             }})
 
@@ -218,6 +245,7 @@ def load_trades(exchange, db):
     for trade in db.find():
         try:
             model = TradeModel(exchange, db)
-            model.watch(trade)
+            model.attach(rec=trade)
+            model.watch()
         except BaseException as err:
             logging.error(err)          
