@@ -16,22 +16,27 @@ states = [
     'DISABLED',
     'LIVE',
     'LONG',
+    'LONG_OCO',
     'STOPPED',
+    'TARGET',
     'SOLD'
 ]
 transitions = [
     { 'trigger': 'start', 'source': 'DISABLED', 'dest': 'LIVE'},
     { 'trigger': 'disable', 'source': 'LIVE', 'dest': 'DISABLED'},
-    { 'trigger': 'tick', 'source': 'LIVE', 'dest': 'LONG', 'conditions': 'is_buy_signal', 'before' : ['buy_on_exchange', 'loadrec', 'set_stop_on_exchange']},
-    { 'trigger': 'movestop', 'source': 'LONG', 'dest': 'LONG' ,'before': ['saverec', 'loadrec', 'remove_stop_on_exchange', 'set_stop_on_exchange']},
-    { 'trigger': 'setstop', 'source': 'LONG', 'dest': 'LONG' ,'before': ['saverec', 'loadrec', 'set_stop_on_exchange']},
-    { 'trigger': 'tick', 'source': 'LONG', 'dest': 'STOPPED', 'conditions': 'is_stopped'},
-    { 'trigger': 'tick', 'source': 'LONG', 'dest': 'SOLD' ,'conditions': 'is_sell_signal', 'before': ['remove_stop_on_exchange', 'sell_on_exchange']},
-    { 'trigger': 'sell', 'source': 'LONG', 'dest': 'SOLD' , 'before': ['remove_stop_on_exchange', 'sell_on_exchange']},
+    { 'trigger': 'tick', 'source': 'LIVE', 'dest': 'LONG', 'conditions': 'is_buy_signal', 'before' : ['buy_on_exchange', 'loadrec', 'set_oco_on_exchange']},
+    { 'trigger': 'moveoco', 'source': 'LONG_OCO', 'dest': 'LONG_OCO' ,'before': ['saverec', 'loadrec', 'cancel_oco_on_exchange', 'set_oco_on_exchange']},
+    { 'trigger': 'canceloco', 'source': 'LONG_OCO', 'dest': 'LONG' ,'before': ['cancel_oco_on_exchange', 'loadrec']},
+    { 'trigger': 'setoco', 'source': 'LONG', 'dest': 'LONG_OCO' ,'before': ['set_oco_on_exchange', 'loadrec']},
+    # { 'trigger': 'tick', 'source': 'LONG', 'dest': 'LONG_OCO' ,'before': ['set_oco_on_exchange']},
+    # { 'trigger': 'movetarget', 'source': 'LONG', 'dest': 'LONG' ,'before': ['saverec', 'loadrec', 'cancel_oco_on_exchange', 'set_oco_on_exchange']},
+    { 'trigger': 'tick', 'source': 'LONG_OCO', 'dest': 'STOPPED', 'conditions': 'is_stopped'},
+    { 'trigger': 'tick', 'source': 'LONG_OCO', 'dest': 'TARGET' ,'conditions': 'is_target'},
+    { 'trigger': 'sell', 'source': 'LONG_OCO', 'dest': 'SOLD' , 'before': ['cancel_oco_on_exchange', 'sell_on_exchange']},
     { 'trigger': 'update', 'source': '*', 'dest': None, 'before': 'saverec', 'after': 'loadrec'},
     { 'trigger': 'load', 'source': '*', 'dest': None, 'before': 'loadrec'},
     # { 'trigger': 'save', 'source': '*', 'dest': None, 'before': 'saverec'},
-    { 'trigger': 'delete', 'source': '*', 'dest': None, 'before': 'deleterec'},
+    { 'trigger': 'delete', 'source': '*', 'dest': None, 'before': ['deleterec', 'unwatch']},
     { 'trigger': 'insert', 'source': '*', 'dest': None, 'before': 'insertrec'},
     { 'trigger': 'attach', 'source': '*', 'dest': None, 'before': 'attachrec'}
 
@@ -124,10 +129,11 @@ class TradeModel(object):
 
     def is_sell_signal(self, event):
         logging.debug(event.kwargs)
-        ticker = event.kwargs['ticker']
-        if float(ticker['curDayClose']) >= float(self.rec.target):
-            return True
         return False
+        # ticker = event.kwargs['ticker']
+        # if float(ticker['curDayClose']) >= float(self.rec.target):
+        #     return True
+        # return False
 
     def is_stopped(self, event):
         logging.debug(event.kwargs)
@@ -136,6 +142,17 @@ class TradeModel(object):
             return True
         return False
 
+    def is_target(self, event):
+        logging.debug(event.kwargs)
+        ticker = event.kwargs['ticker']
+        if float(ticker['curDayClose']) >= float(self.rec.target):
+            return True
+        return False
+
+
+    def is_error(self, event):
+        logging.debug(event.kwargs)
+        return 'err' in self.rec
 
     def buy_on_exchange(self, event):
         logging.debug(event.kwargs)
@@ -170,14 +187,30 @@ class TradeModel(object):
                 'err': str(err)
             }})
 
-    def set_stop_on_exchange(self, event):
+    def set_oco_on_exchange(self, event):
         logging.debug(event.kwargs)
         try:
-            resp =self.exchange.create_order(self.rec.symbol, 'STOP_LOSS_LIMIT', 'sell', self.rec['availableQty'] * 0.99, 
-                0.90 * float(self.rec.stop), {'stopPrice': float(self.rec.stop),'type': 'stopLimit'})
+            market = self.exchange.market(self.rec.symbol)
+            # resp =self.exchange.create_order(self.rec.symbol, 'STOP_LOSS_LIMIT', 'sell', self.rec['availableQty'] * 0.99, 
+            #     0.90 * float(self.rec.stop), {'stopPrice': float(self.rec.stop),'type': 'stopLimit'})
+            resp = self.exchange.private_post_order_oco({
+                'symbol': market['id'],
+                'side': 'SELL',  # SELL, BUY
+                'quantity': self.exchange.amount_to_precision(self.rec.symbol, self.rec.availableQty),
+                'price': self.exchange.price_to_precision(self.rec.symbol, self.rec.target),
+                'stopPrice': self.exchange.price_to_precision(self.rec.symbol, self.rec.stop),
+                'stopLimitPrice': self.exchange.price_to_precision(self.rec.symbol, self.rec.stop * 0.95),  # If provided, stopLimitTimeInForce is required
+                'stopLimitTimeInForce': 'GTC',  # GTC, FOK, IOC
+                # 'listClientOrderId': exchange.uuid(),  # A unique Id for the entire orderList
+                # 'limitClientOrderId': exchange.uuid(),  # A unique Id for the limit order
+                # 'limitIcebergQty': exchangea.amount_to_precision(symbol, limit_iceberg_quantity),
+                # 'stopClientOrderId': exchange.uuid()  # A unique Id for the stop loss/stop loss limit leg
+                # 'stopIcebergQty': exchange.amount_to_precision(symbol, stop_iceberg_quantity),
+                # 'newOrderRespType': 'ACK',  # ACK, RESULT, FULL
+            })
             self.db.update_one({'_id' : self.rec._id }, {
             '$set': {
-                'curStopResp': resp
+                'oco': resp
             }})
         except BaseException as err:
             logging.debug(err)
@@ -187,11 +220,30 @@ class TradeModel(object):
                 'err': str(err)
             }})
 
+    def cancel_oco_on_exchange(self, event):
+        logging.debug(event.kwargs)
+        try:
+            if self.rec.oco:
+                resp = self.exchange.privateDeleteOrderList({'symbol': self.rec.market, 'orderListId': self.rec.oco.orderListId})
+                # exchange.cancel_order(self.rec.curStopResp['orders'][0]['id'], symbol=self.rec.symbol)
+                self.db.update_one({'_id' : self.rec._id }, {
+                    '$set': {                        
+                        'cancelOCO': resp
+                    }})
+        
+        except BaseException as err:
+            logging.error(err)
+            self.db.update_one({'_id' : self.rec._id }, {
+            '$set': {
+                'state': 'ERROR',
+                'err': str(err)
+            }})
+  
     def remove_stop_on_exchange(self, event):
         logging.debug(event.kwargs)
         try:
             if self.rec.curStopResp:
-                resp =self.exchange.cancel_order(self.rec.curStopResp['id'], symbol=self.rec.symbol)
+                resp =self.exchange.cancel_order(self.rec.curStopResp['orders'][0]['id'], symbol=self.rec.symbol)
                 self.db.update_one({'_id' : self.rec._id }, {
                     '$set': {                        
                         'cancelStopResp': resp
@@ -230,15 +282,16 @@ class TradeModel(object):
             }})
 
     def watch(self):
-        symbol = self.rec.symbol
-        if not symbol in trades: trades[symbol] = {}
-        trades[symbol][str(self.rec._id)] = self
+        market = self.rec.market
+        if not market in trades: trades[market] = {}
+        trades[market][str(self.rec._id)] = self
 
     def unwatch(self):
-        trades[self.rec.symbol].pop(self.rec._id, None)
+        trades[self.rec.market].pop(self.rec._id, None)
 
 
-
+# def get_trades():
+#     return trades
 
 def load_trades(exchange, db):
     trades.clear()
@@ -248,4 +301,5 @@ def load_trades(exchange, db):
             model.attach(rec=trade)
             model.watch()
         except BaseException as err:
-            logging.error(err)          
+            logging.error(err)
+    return trades
