@@ -8,8 +8,6 @@ from datetime import datetime
 
 from dotmap import DotMap
 
-trades = {}
-
 states = [
     'ERROR',
     'DETACHED',
@@ -17,6 +15,7 @@ states = [
     'LIVE',
     'LONG',
     'LONG_OCO',
+    'OCO_DONE',
     'STOPPED',
     'TARGET',
     'SOLD'
@@ -24,7 +23,7 @@ states = [
 transitions = [
     { 'trigger': 'start', 'source': 'DISABLED', 'dest': 'LIVE'},
     { 'trigger': 'disable', 'source': 'LIVE', 'dest': 'DISABLED'},
-    { 'trigger': 'tick', 'source': 'LIVE', 'dest': 'LONG', 'conditions': 'is_buy_signal', 'before' : ['buy_on_exchange', 'loadrec', 'set_oco_on_exchange']},
+    { 'trigger': 'tick', 'source': 'LIVE', 'dest': 'LONG_OCO', 'conditions': 'is_buy_signal', 'before' : ['buy_on_exchange', 'loadrec', 'set_oco_on_exchange']},
     { 'trigger': 'moveoco', 'source': 'LONG_OCO', 'dest': 'LONG_OCO' ,'before': ['saverec', 'loadrec', 'cancel_oco_on_exchange', 'set_oco_on_exchange']},
     { 'trigger': 'canceloco', 'source': 'LONG_OCO', 'dest': 'LONG' ,'before': ['cancel_oco_on_exchange', 'loadrec']},
     { 'trigger': 'setoco', 'source': 'LONG', 'dest': 'LONG_OCO' ,'before': ['set_oco_on_exchange', 'loadrec']},
@@ -33,10 +32,11 @@ transitions = [
     { 'trigger': 'tick', 'source': 'LONG_OCO', 'dest': 'STOPPED', 'conditions': 'is_stopped'},
     { 'trigger': 'tick', 'source': 'LONG_OCO', 'dest': 'TARGET' ,'conditions': 'is_target'},
     { 'trigger': 'sell', 'source': 'LONG_OCO', 'dest': 'SOLD' , 'before': ['cancel_oco_on_exchange', 'sell_on_exchange']},
+    { 'trigger': 'sell', 'source': 'LONG', 'dest': 'SOLD' , 'before': ['sell_on_exchange']},
     { 'trigger': 'update', 'source': '*', 'dest': None, 'before': 'saverec', 'after': 'loadrec'},
     { 'trigger': 'load', 'source': '*', 'dest': None, 'before': 'loadrec'},
     # { 'trigger': 'save', 'source': '*', 'dest': None, 'before': 'saverec'},
-    { 'trigger': 'delete', 'source': '*', 'dest': None, 'before': ['deleterec', 'unwatch']},
+    { 'trigger': 'delete', 'source': '*', 'dest': None, 'before': ['deleterec']},
     { 'trigger': 'insert', 'source': '*', 'dest': None, 'before': 'insertrec'},
     { 'trigger': 'attach', 'source': '*', 'dest': None, 'before': 'attachrec'}
 
@@ -281,25 +281,3 @@ class TradeModel(object):
                     }
             }})
 
-    def watch(self):
-        market = self.rec.market
-        if not market in trades: trades[market] = {}
-        trades[market][str(self.rec._id)] = self
-
-    def unwatch(self):
-        trades[self.rec.market].pop(self.rec._id, None)
-
-
-# def get_trades():
-#     return trades
-
-def load_trades(exchange, db):
-    trades.clear()
-    for trade in db.find():
-        try:
-            model = TradeModel(exchange, db)
-            model.attach(rec=trade)
-            model.watch()
-        except BaseException as err:
-            logging.error(err)
-    return trades

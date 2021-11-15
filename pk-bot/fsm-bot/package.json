@@ -9,7 +9,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "binance-api-node": "^0.11.21",
+    "binance-api-node": "^0.11.24",
+    "kucoin-node-sdk": "^1.0.4",
+    "websocket": "^1.0.34",
     "zeromq": "^5.2.8"
   }
 }
