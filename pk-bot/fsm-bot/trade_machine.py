@@ -93,7 +93,6 @@ class TradeModel(object):
         logging.debug(f'deleting {self.rec._id} {self.rec.id}')
         try:
             self.db.delete_one({'_id' : self.rec._id })
-            self.unwatch()
         except BaseException as err:
             logging.error(err)
             self.db.update_one({'_id' : self.rec._id }, {
