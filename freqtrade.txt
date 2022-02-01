@@ -28,6 +28,8 @@ freqtrade download-data --userdir freq-user-data --exchange binance -t 5m 15m 1h
 freqtrade download-data --userdir freq-user-data --exchange binance -t 1m 5m 15m --timerange 20210720- -p BTC/USDT
 freqtrade download-data --userdir freq-user-data --exchange binance -t 1m --timerange 20200901-20210406 -p BTC/USDT ETH/USDT USDT/GBP
 
+freqtrade download-data --userdir freq-user-data --exchange kucoin -t 1h 15m --timerange 20210101-20220124 -p ALGO/USDT SOLANA/USDT BTC/USDT ETH/USDT
+
 freqtrade download-data  --userdir ./freq-user-data --exchange binance  -t 1m --timerange 20200901-20210406 -p ETH/BTC XRP/BTC ALGO/BTC ADA/BTC LINK/BTC BNB/BTC DOT/BTC XLM/BTC LTC/BTC AVAX/BTC AAVE/BTC EGLD/BTC ATOM/BTC DOGE/BTC GRT/BTC ENJ/BTC
 -----------------
 freqtrade download-data --exchange binance --timerange 20100101- -t 12h 8h 1d -p ALGO/USDT AVAX/USDT ADA/USDT ATOM/USDT BAL/USDT BCH/USDT BNB/USDT BTC/USDT COMP/USDT DASH/USDT DOGE/USDT DOT/USDT EGLD/USDT ENJ/USDT EOS/USDT ETH/USDT FIL/USDT FTT/USDT KSM/USDT LINK/USDT LRC/USDT LTC/USDT LUNA/USDT MATIC/USDT REEF/USDT REN/USDT RUNE/USDT SOL/USDT THETA/USDT TRX/USDT UNI/USDT VET/USDT XLM/USDT XRP/USDT
