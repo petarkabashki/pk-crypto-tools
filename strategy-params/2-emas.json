@@ -1,1 +1,1 @@
-{"w2log": 14, "w": 0, "mav1": 13, "mav2": 26, "mav3": 50, "mav1mav2": 0.003, "mav2mav3": -0.0055, "stop_gap": 0.025, "slipage": 0.001, "risk": 0.01, "r2r": 1.9}
+{"w2log": 15, "w": 0, "mav1": 14, "mav2": 21, "mav3": 50, "mav1mav2": -0.005, "mav2mav3": 0.0075, "stop_gap": 0.0, "slipage": 0.002, "risk": 0.01, "sl": 0.06, "r2r": 2.5, "wbtp": 0.0, "trail": 0.005}
