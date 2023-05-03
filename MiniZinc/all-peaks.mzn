@@ -14,7 +14,7 @@ array[PKTR] of var KLN0: apktr;
 
 var PKTR: npktr;
 
-constraint apktr[npktr] >= 1;
+constraint apktr[npktr] = 1;
 constraint apktr[pktr_n] = kl_n;
 constraint forall(j in 1..npktr-1)(apktr[j] = 0);
 
@@ -35,6 +35,6 @@ constraint forall(i in npktr..pktr_n-2)(
 include "alldifferent.mzn";
 constraint all_different_except_0(apktr);
 
-solve minimize npktr;
+solve maximize npktr;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
