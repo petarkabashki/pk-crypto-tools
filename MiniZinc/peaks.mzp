@@ -1,0 +1,14 @@
+{
+    "openFiles": [
+        "klines.dzn",
+        "peaks.mzn"
+    ],
+    "openTab": 1,
+    "projectFiles": [
+        "klines.dzn",
+        "peaks.mzn"
+    ],
+    "selectedBuiltinConfigId": "org.gecode.gecode",
+    "selectedBuiltinConfigVersion": "6.3.0",
+    "version": 106
+}

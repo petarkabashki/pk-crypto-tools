@@ -1,80 +1,10 @@
 
--------------------------
-Please use 'freqtrade new-config -c config.json' to generate a new configuration file.
--------------------------
--------------------------
-Run the bot !
--------------------------
-source src/freqtrade/.env/bin/activate
-
-freqtrade <subcommand>
-
 
 *********************************************************************************
 freqtrade backtesting -c ./freqtrade-config.json -s PKStrategy --datadir ./freq-user-data/data/binance --timeframe 1m --timerange=20210101-
 
-freqtrade trade --userdir ./freqtrade-user-data -c ./freqtrade-config.json
+freqtrade trade --userdir ./freq-user-data -c ./freqtrade-config.json
 
-freqtrade download-data --exchange binance -t 5m -p BTC/USDT
-
-freqtrade list-data --exchange binance
-
-freqtrade backtesting --datadir user_data/data/binance  --export trades --stake-amount 100 -s PKBStrategy -i 15m
+freqtrade download-data --userdir ./freq-user-data --exchange binance -t 1d 8h 4h  --timerange=20210101- -p BTC/USDT ETH/USDT ADA/USDT ALGO/USDT SOL/USDT
 
 
-
-freqtrade download-data --userdir freq-user-data --exchange binance -t 5m 15m 1h --timerange 20190101- -p EGLD/BTC GRT/BTC ETH/BTC ALGO/BTC AVAX/BTC
-
-freqtrade download-data --userdir freq-user-data --exchange binance -t 1m 5m 15m --timerange 20210720- -p BTC/USDT
-freqtrade download-data --userdir freq-user-data --exchange binance -t 1m --timerange 20200901-20210406 -p BTC/USDT ETH/USDT USDT/GBP
-
-freqtrade download-data --userdir freq-user-data --exchange kucoin -t 1h 15m --timerange 20210101-20220124 -p ALGO/USDT SOLANA/USDT BTC/USDT ETH/USDT
-
-freqtrade download-data  --userdir ./freq-user-data --exchange binance  -t 1h --timerange 20200901-20220215 -p ETH/BTC XRP/BTC ALGO/BTC ADA/BTC LINK/BTC BNB/BTC DOT/BTC XLM/BTC LTC/BTC AVAX/BTC AAVE/BTC EGLD/BTC ATOM/BTC DOGE/BTC GRT/BTC ENJ/BTC
-
-freqtrade download-data  --userdir ./freq-user-data --exchange binance  -t 15m 1h 8h 1d --timerange 20210101-20220215 -p ALGO/USDT
------------------
-freqtrade download-data --exchange binance --timerange 20100101- -t 12h 8h 1d -p ALGO/USDT AVAX/USDT ADA/USDT ATOM/USDT BAL/USDT BCH/USDT BNB/USDT BTC/USDT COMP/USDT DASH/USDT DOGE/USDT DOT/USDT EGLD/USDT ENJ/USDT EOS/USDT ETH/USDT FIL/USDT FTT/USDT KSM/USDT LINK/USDT LRC/USDT LTC/USDT LUNA/USDT MATIC/USDT REEF/USDT REN/USDT RUNE/USDT SOL/USDT THETA/USDT TRX/USDT UNI/USDT VET/USDT XLM/USDT XRP/USDT
-
-freqtrade download-data --exchange binance -t 1d 8h 12h 4h 2h 1h 15m -p ALGO/BTC AVAX/BTC ADA/BTC ATOM/BTC BAL/BTC BCH/BTC BNB/BTC COMP/BTC DASH/BTC DOGE/BTC DOT/BTC EGLD/BTC ENJ/BTC EOS/BTC ETH/BTC FIL/BTC FTT/BTC KSM/BTC LINK/BTC LRC/BTC LTC/BTC LUNA/BTC MATIC/BTC REEF/BTC REN/BTC RUNE/BTC SOL/BTC THETA/BTC TRX/BTC UNI/BTC VET/BTC XLM/BTC XRP/BTC
------------------
-
-
-
-
-freqtrade backtesting --datadir user_data/data/binance  --export trades --stake-amount 100 -s PKBStrategy -i 5m --fee 0.001 --timerange 20200101-
-
-freqtrade backtesting --datadir user_data/data/binance  --export trades --stake-amount 100 -s Strategy001 -i 5m --fee 0.001 --timerange 20200401-
-
-
-freqtrade backtesting --datadir user_data/data/binance  --export trades -s PKBStrategy -i 5m --fee 0.001 --timerange 20210501- -p ALGO/BTC
-
-freqtrade plot-dataframe --strategy PKBStrategy -i 5m --indicators1 band_low band_high swing_lows --indicators2 rsi -p BTC/USDT --timerange 20210501-
-
-open user_data/plot/freqtrade-plot-BTC_USDT-5m.html 
-
-open user_data/plot/freqtrade-plot-ALGO_BTC-5m.html 
-
-freqtrade backtesting -c freqtrade-config.json --userdir freq-user-data --strategy BBandsStrategy --timeframe 1m --timerange 1623118200-1623148860
-freqtrade plot-dataframe  -c freqtrade-config.json -s BBandsStrategy --timerange 1621344120-1621351740
-freqtrade plot-profit  -c freqtrade-config.json -s BBandsStrategy --timerange 1621344120-1621351740
-
-freqtrade hyperopt --hyperopt-loss SharpeHyperOptLossDaily --spaces roi buy --strategy BBandsStrategy --config freqtrade-config.json  --timerange 20210705-20210715 -e 100
-
-
-
-# Buy hyperspace params:
-buy_params = {
-    'ema_len': 30, 'swing_low_len': 3
-}
-
-# ROI table:
-minimal_roi = {
-    "0": 0.246,
-    "19": 0.052,
-    "76": 0.011,
-    "165": 0
-}
-
-# Stoploss:
-stoploss = -0.344
