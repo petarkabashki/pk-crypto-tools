@@ -1,0 +1,44 @@
+import util.
+import cp.
+
+
+main =>
+    read_data.
+
+
+read_data => 
+    FD = open("ranges-pi.inp"),
+    Si = read_line(FD).split(","),
+    Fi = read_line(FD).split(","),
+    close(FD),
+    S = [to_integer(X): X in Si],
+    F = [to_integer(X): X in Fi],
+    N = F.length,
+    Nsn = S.length,
+    E = new_array(Nsn),
+    % foreach(I in 1..Nsn) L[I] :: 0..Nsn end, 
+    % E :: 1..Nsn,
+    write(Nsn),
+    foreach(I in 1..Nsn)
+        E[I] :: S[I]..N
+    end,
+    foreach(I in 1..Nsn, J in S[I]..E[I])
+        true
+        % write(I)
+        % L #= E[I] - S[I],
+        % foreach(J in S[I]..E[I])
+        %     write(J)
+        % end
+        % write(L)
+        % 1 #= 1
+        % sum([F[J] : J in S[I]..E[I]]) #= E[I] - S[J]
+    end,
+    % Total = sum([L[I] | I in 1..Nsn]),
+    % solve([$max(Total), L]),
+    solve(E),
+    write(E)
+    % foreach(X in F) writeln(X) end
+    % write(S)
+    .
+
+

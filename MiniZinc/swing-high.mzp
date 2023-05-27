@@ -1,16 +1,13 @@
 {
     "openFiles": [
-        "all-swing_highs.mzn",
-        "ranges.mzn",
-        "ranges-dzn.json"
+        "all-swing_highs.json",
+        "all-swing_highs.mzn"
     ],
     "openTab": 1,
     "projectFiles": [
         "all-peaks.mzn",
         "all-swing_highs.json",
         "all-swing_highs.mzn",
-        "ranges-dzn.json",
-        "ranges.mzn",
         "swing_high.json",
         "swing_high.mzn"
     ],
