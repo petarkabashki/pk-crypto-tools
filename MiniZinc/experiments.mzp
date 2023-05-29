@@ -1,0 +1,14 @@
+{
+    "openFiles": [
+        "all-peaks.mzn",
+        "all-peaks-dzn.json"
+    ],
+    "openTab": 0,
+    "projectFiles": [
+        "all-peaks-dzn.json",
+        "all-peaks.mzn"
+    ],
+    "selectedBuiltinConfigId": "org.gecode.gecode",
+    "selectedBuiltinConfigVersion": "6.3.0",
+    "version": 106
+}
