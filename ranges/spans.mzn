@@ -12,13 +12,8 @@ int:spa_n = card(gba_sig);
 set of int: SPA_N=1..spa_n;
 
 array[SPA_N] of var gba_is_end: spa_ends;
-constraint strictly_increasing(spa_ends);
 
-% constraint begs_bag = {i | i in DF_N where ba_is_beg[i]};
-
-% constraint card(begs_bag) == spa_n;
-% constraint forall(i in DF_N)(ba_is_beg[i] -> i in begs_bag);
-% constraint ba_in[df_n] -> df_n in ends_bag /\ ba_spa_end[df_n];
+constraint forall(i in SPA_N)(sum(j in gba_is_beg[i]..spa_ends[i])(ba_in[j]) == );
 
 include "globals.mzn";
 % set of int: SPA_N = 1..spa_n;

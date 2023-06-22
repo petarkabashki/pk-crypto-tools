@@ -1,11 +1,17 @@
 {
     "openFiles": [
-        "ranges.mzn"
+        "ranges.mzn",
+        "span-endings.mzn",
+        "pars-span-endings.dzn.json"
     ],
-    "openTab": 0,
+    "openTab": 1,
     "projectFiles": [
+        "pars-span-endings.dzn.json",
         "ranges.dzn.json",
-        "ranges.mzn"
+        "ranges.mzn",
+        "span-endings.mzn",
+        "spans.dzn.json",
+        "spans.mzn"
     ],
     "selectedBuiltinConfigId": "org.gecode.gecode",
     "selectedBuiltinConfigVersion": "6.3.0",
