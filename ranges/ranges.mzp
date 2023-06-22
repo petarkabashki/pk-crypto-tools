@@ -1,0 +1,13 @@
+{
+    "openFiles": [
+        "ranges.mzn"
+    ],
+    "openTab": 0,
+    "projectFiles": [
+        "ranges.dzn.json",
+        "ranges.mzn"
+    ],
+    "selectedBuiltinConfigId": "org.gecode.gecode",
+    "selectedBuiltinConfigVersion": "6.3.0",
+    "version": 106
+}

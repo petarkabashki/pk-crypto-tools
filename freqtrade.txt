@@ -5,6 +5,6 @@ freqtrade backtesting -c ./freqtrade-config.json -s PKStrategy --datadir ./freq-
 
 freqtrade trade --userdir ./freq-user-data -c ./freqtrade-config.json
 
-freqtrade download-data --userdir ./freq-user-data --exchange binance -t 15m --timerange=20230101- -p BTC/USDT ETH/USDT ADA/USDT ALGO/USDT SOL/USDT
+freqtrade download-data --userdir ./freq-user-data --exchange binance -t 3d 1d 8h 4h --timerange=20200101- -p BTC/USDT ETH/USDT ADA/USDT ALGO/USDT SOL/USDT
 
 
