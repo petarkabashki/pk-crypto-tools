@@ -37,10 +37,29 @@
         "sell_profit_only": false,
         "ignore_roi_if_buy_signal": false
     },
-    "exchange": {
+    "exchange1": {
         "name": "binance",
         "key": "",
         "secret": "",
+        "ccxt_config": {"enableRateLimit": true},
+        "ccxt_async_config": {
+            "enableRateLimit": true
+        },
+        "pair_whitelist": [
+            "BTC/USDT"
+        ],
+        "pair_blacklist": [
+            "BNB/USD",
+            "BNB/USDT",
+            "BNB/BTC",
+            "BNB/<STAKE>"
+        ]
+    },
+    "exchange": {
+        "name": "kucoin",
+        "key": "64a80c89ea93ce000118422b",
+        "secret": "8df0d5e5-0627-4a7d-aa12-89b87a435f1f",
+        "password": "ktVVLYFPPzvRnY6V",
         "ccxt_config": {"enableRateLimit": true},
         "ccxt_async_config": {
             "enableRateLimit": true
