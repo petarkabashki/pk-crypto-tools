@@ -57,9 +57,6 @@
     },
     "exchange": {
         "name": "kucoin",
-        "key": "64a80c89ea93ce000118422b",
-        "secret": "8df0d5e5-0627-4a7d-aa12-89b87a435f1f",
-        "password": "ktVVLYFPPzvRnY6V",
         "ccxt_config": {"enableRateLimit": true},
         "ccxt_async_config": {
             "enableRateLimit": true

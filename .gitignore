@@ -16,3 +16,4 @@ key.enc
 **/hyperopt_results
 **/plot
 *.lock
+*.csv
