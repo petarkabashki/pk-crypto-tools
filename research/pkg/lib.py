@@ -42,7 +42,7 @@ def load_candles(exchange, pair, timeframe):
 def identify_axes(ax_dict, fontsize=48):
     kw = dict(ha="center", va="center", fontsize=fontsize, color="darkgrey")
     for k, ax in ax_dict.items():
-        ax.text(0.5, 0.5, k, transform=ax.transAxes, **kw)
+        ax.text(0.5, 0.5, k, alpha=0.1, transform=ax.transAxes, **kw)
 
 
 def plot_candles(wdf, ax=None, kwargs={}):
@@ -84,11 +84,12 @@ def fu_printer(odf, strategy, strategy_params = {}, indicator_func = None, signa
     wlen = 2**w2log
     w2len = wlen // 2
     nwin = olen // w2len
-    olen, w2log, wlen, w2len, nwin
+    # olen, w2log, wlen, w2len, nwin
     ###
     fu_params = {
             'w2log':    {'wdg': IntSlider(description="n2", min=0, max=13, step=1, value=w2log)}, 
             'w':        {'wdg': IntSlider(description="w", min=0, max=nwin, step=1, value=1)},
+            'inow':        {'wdg': IntSlider(description="inow", min=0, max=wlen-1, step=1, value=1)},
             "fu":       {'wdg': IntSlider(value=7,min=1,max=50,step=1,description='Hold',continuous_update=False)},
             "fu_lines": {'wdg': Checkbox(value=True, description='Fu lines', disabled=False)},
             "candles":  {"wdg": Checkbox(value=True, description='Candles', disabled=False)},
@@ -98,9 +99,11 @@ def fu_printer(odf, strategy, strategy_params = {}, indicator_func = None, signa
         wlen = 2**w2log
         w2len = wlen // 2
         nwin = olen // w2len
-        fu_params['w2log']['wdg'].max = nwin
-        fu_params['w2log']['wdg'].value = 0
-    fu_params['w']['wdg'].observe(update_sl_w_range, 'value')
+        fu_params['w']['wdg'].value = 0
+        fu_params['w']['wdg'].max = nwin
+        fu_params['inow']['wdg'].max = wlen * 2 -1
+        fu_params['inow']['wdg'].value = wlen -1
+    fu_params['w2log']['wdg'].observe(update_sl_w_range, 'value')
 
     all_params = {
         ** fu_params,
@@ -121,53 +124,61 @@ def fu_printer(odf, strategy, strategy_params = {}, indicator_func = None, signa
     else: print(f'File not found: {strategy_params_json}')
 
     wdf=None
-    def printer(
-            w2log, w, fu, candles, fu_lines, *args, **kwargs# ema, std, kargs
-
-    ):   
-        # print('kwargs', kwargs)
+    def printer(**pkwargs):   
+        w2log, w, fu, candles, fu_lines = pkwargs['w2log'], pkwargs['w'], pkwargs['fu'], pkwargs['candles'], pkwargs['fu_lines']
 
         wlen = 2**w2log
         w2len = wlen // 2
         nwin = olen // w2len
 
-        with open(strategy_params_json, "w") as f: f.write(json.dumps({k: v['wdg'].value for k, v in strategy_params.items()}))
+        with open(strategy_params_json, "w") as f: f.write(json.dumps({k: v['wdg'].value for k, v in all_params.items()}))
         
         
         wst = w * w2len
         wed = wst + wlen
         if olen - wed + 1 < w2len: wed = - 1
-        print(f'wst:{wst}, wed:{wed}')
+        # print(f'wst:{wst}, wed:{wed}')
         wdf = odf.iloc[wst:wed,:].copy()    
         # wlen = len(wdf)
 
+        inow = pkwargs['inow']
+        ixnow = wdf.index[inow]
+
         indicators = None
         if indicator_func is not None:
-            indicators = indicator_func(wdf, **kwargs)
+            indicators = indicator_func(**{'wdf': wdf, 'pkwargs': pkwargs})
 
         signals = None
-        # if signal_func is not None:
-        #     sigdf = signal_func(wdf, inddf, **kwargs)
+        if signal_func is not None:
+            # print('indicators', indicators)
+
+            signals = signal_func(indicators, pkwargs)
 
         fudf = get_fudf(wdf, fu)
 
         print(f'N={len(wdf)}; Period: {wdf.index[-1] - wdf.index[0]}, Start: {wdf.index[0]}, End: {wdf.index[-1]}\n')
-        
-        fig = plt.figure(layout="constrained", figsize=(12,4))
+        print('plt.rcParam["lines.linewidth"]: ', plt.rcParams["lines.linewidth"])
+        fig = plt.figure(layout="constrained", figsize=(12,6))
         ax_dict = fig.subplot_mosaic("""
             AAA
+            BBB
             XYZ
             """,
-            height_ratios=[2, 1],
+            height_ratios=[3, 1, 1],
         )
         identify_axes(ax_dict)
         plt.xticks(rotation=30, ha='right')
         axa = ax_dict['A']
+        axb = ax_dict['B']
+        wdf.close.plot(ax=axa, lw=0.4, alpha=0.);
+
         if fu_lines: fudf[['fu_high_max', 'fu_low_min']].plot(ax=axa, lw=0.4);
         if candles: plot_candles(wdf, ax=axa);
         else: axa.plot(wdf.close, c='b');
 
-        if draw_func is not None: draw_func(ax_dict, wdf, indicators, signals)
+        axa.axvline(ixnow, lw=3, c='m', alpha=0.5)
+
+        if draw_func is not None: draw_func(ax_dict, indicators, signals, pkwargs)
 
         
         plt.show()
