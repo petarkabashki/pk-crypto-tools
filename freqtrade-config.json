@@ -14,14 +14,17 @@
     "trailing_stop": false,
     "cancel_open_orders_on_exit": false,
     "fee": 0.001,
+    "trading_mode": "futures",
+    // "margin_mode": "isolated",
+
     "unfilledtimeout": {
-        "buy": 10,
-        "sell": 30,
+        "entry": 10,
+        "exit": 30,
         "unit": "minutes"
     },
-    "bid_strategy": {
+    "entry_pricing": {
         "price_side": "bid",
-        "ask_last_balance": 0.0,
+        "price_last_balance": 0.0,
         "use_order_book": false,
         "order_book_top": 1,
         "check_depth_of_market": {
@@ -29,13 +32,13 @@
             "bids_to_ask_delta": 1
         }
     },
-    "ask_strategy": {
+    "exit_pricing": {
         "price_side": "ask",
         "use_order_book": false,
         "order_book_min": 1,
         "order_book_max": 1,
-        "sell_profit_only": false,
-        "ignore_roi_if_buy_signal": false
+        "exit_profit_only": false,
+        "ignore_roi_if_entry_signal": false
     },
     "exchange1": {
         "name": "binance",
@@ -57,12 +60,20 @@
     },
     "exchange": {
         "name": "kucoin",
-        "ccxt_config": {"enableRateLimit": true},
+        "ccxt_config": {
+	    "enableRateLimit": true,
+	    "options": {"defaultType": "future"},   // This is the important part
+	    "verify": false
+	    },
         "ccxt_async_config": {
-            "enableRateLimit": true
+            "enableRateLimit": false,
+            "rateLimit": 500,
+            "aiohttp_trust_env": false,
+            "options": {"defaultType": "future"},   // This is the important part
         },
         "pair_whitelist": [
-            "BTC/USDT"
+            "BTC/USDT",
+            "ALGO/USDT"
         ],
         "pair_blacklist": [
             "BNB/USD",
@@ -106,7 +117,7 @@
     },
     "bot_name": "freqtrade",
     "initial_state": "running",
-    "forcebuy_enable": false,
+    "force_entry_enable": false,
     "internals": {
         "process_throttle_secs": 5
     }

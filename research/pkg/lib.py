@@ -95,14 +95,16 @@ def fu_printer(odf, strategy, strategy_params = {}, indicator_func = None, signa
             "candles":  {"wdg": Checkbox(value=True, description='Candles', disabled=False)},
         }
     
-    def update_sl_w_range(*args):
-        wlen = 2**w2log
+    def update_sl_w_range(kwargs):
+        print('*kwargs', kwargs)
+        wlen = 2**kwargs['new'] #fu_params['w2loog'].value
+
         w2len = wlen // 2
         nwin = olen // w2len
         fu_params['w']['wdg'].value = 0
         fu_params['w']['wdg'].max = nwin
-        fu_params['inow']['wdg'].max = wlen * 2 -1
-        fu_params['inow']['wdg'].value = wlen -1
+        fu_params['inow']['wdg'].max = wlen -1
+        fu_params['inow']['wdg'].value = w2len -1
     fu_params['w2log']['wdg'].observe(update_sl_w_range, 'value')
 
     all_params = {
@@ -135,7 +137,8 @@ def fu_printer(odf, strategy, strategy_params = {}, indicator_func = None, signa
         
         
         wst = w * w2len
-        wed = wst + wlen
+        wed = min(olen-1, wst + wlen)
+        wlen = wed - wst + 1
         if olen - wed + 1 < w2len: wed = - 1
         # print(f'wst:{wst}, wed:{wed}')
         wdf = odf.iloc[wst:wed,:].copy()    
@@ -157,7 +160,7 @@ def fu_printer(odf, strategy, strategy_params = {}, indicator_func = None, signa
         fudf = get_fudf(wdf, fu)
 
         print(f'N={len(wdf)}; Period: {wdf.index[-1] - wdf.index[0]}, Start: {wdf.index[0]}, End: {wdf.index[-1]}\n')
-        print('plt.rcParam["lines.linewidth"]: ', plt.rcParams["lines.linewidth"])
+        # print('plt.rcParam["lines.linewidth"]: ', plt.rcParams["lines.linewidth"])
         fig = plt.figure(layout="constrained", figsize=(12,6))
         ax_dict = fig.subplot_mosaic("""
             AAA
@@ -170,11 +173,12 @@ def fu_printer(odf, strategy, strategy_params = {}, indicator_func = None, signa
         plt.xticks(rotation=30, ha='right')
         axa = ax_dict['A']
         axb = ax_dict['B']
-        wdf.close.plot(ax=axa, lw=0.4, alpha=0.);
+        wdf.close.multiply(1.1).plot(ax=axa, lw=0.4, alpha=0.);
 
         if fu_lines: fudf[['fu_high_max', 'fu_low_min']].plot(ax=axa, lw=0.4);
-        if candles: plot_candles(wdf, ax=axa);
-        else: axa.plot(wdf.close, c='b');
+        if candles: plot_candles(wdf, ax=axa)
+        else: wdf.close.plot(ax=axa, c='b');
+
 
         axa.axvline(ixnow, lw=3, c='m', alpha=0.5)
 
