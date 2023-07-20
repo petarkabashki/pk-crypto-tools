@@ -2,6 +2,8 @@
 # flake8: noqa: F401
 # isort: skip_file
 # --- Do not remove these libs ---
+
+#%%
 import numpy as np  # noqa
 import pandas as pd  # noqa
 from pandas import DataFrame
@@ -25,7 +27,6 @@ register_matplotlib_converters()
 # Add your lib to import here
 # import talib.abstract as ta
 import freqtrade.vendor.qtpylib.indicators as qtpylib
-
 
 # This class is a sample. Feel free to customize it.
 class BottomOutAlgoStrategy(IStrategy):
