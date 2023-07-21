@@ -24,7 +24,7 @@ include "globals.mzn";
 constraint forall(i in 1..n) (
     let { 0..n_idxs: ilast = max([if idxs[j] >= i then 0 else j endif | j in 1..n_idxs] ++ [0]) } in
     forall(j in 1..m)(
-        result[i,m-j+1] = if ilast - j + 1 >= 1 then idxs[ilast - j + 1] else 0 endif 
+        result[i,m-j+1] = if ilast - j + 1 >= 1 then idxs[ilast - j + 1] - 1 else 0 endif 
     )
 %     /\ forall(j in 
 );
