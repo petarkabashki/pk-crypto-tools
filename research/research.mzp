@@ -1,8 +1,15 @@
 {
     "openFiles": [
+        "rolling-last-n.mzn",
+        "pars-rolling-last-n.dzn.json",
+        "last-such.mzn"
     ],
-    "openTab": -1,
+    "openTab": 0,
     "projectFiles": [
+        "last-such.mzn",
+        "pars-last-such.dzn.json",
+        "pars-rolling-last-n.dzn.json",
+        "rolling-last-n.mzn"
     ],
     "selectedBuiltinConfigId": "org.gecode.gecode",
     "selectedBuiltinConfigVersion": "6.3.0",

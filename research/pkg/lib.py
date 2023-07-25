@@ -8,6 +8,9 @@ import json
 from ipywidgets import interact, interactive, fixed, interact_manual
 # import ipywidgets as widgets
 from ipywidgets import *
+from minizinc import Instance, Model, Solver, Status as mzStatus
+# import nest_asyncio
+# nest_asyncio.apply()
 
 def load_close_prices(exchange, coins, quote, time_frame, start_ts, end_ts):
     data_folder = f'../freq-user-data/data/{exchange}'
@@ -37,6 +40,20 @@ def load_candles(exchange, pair, timeframe):
     odf.set_index(pd.DatetimeIndex(odf["date"]), inplace=True, drop=True)
     odf = odf.sort_index()
     return odf
+
+def call_mzn_model(model_name,model_params):
+    with open(f'pars-{model_name}.dzn.json', 'w+') as f: f.write(json.dumps(model_params, indent=2))
+
+    # print('Model params:', model_params)
+
+    mzn_model = Model(f'{model_name}.mzn')
+    gecode = Solver.lookup("gecode")
+    instance = Instance(gecode, mzn_model)
+
+    for k,v in model_params.items(): instance[k] = v
+    result = instance.solve()
+
+    return result
 
 
 def identify_axes(ax_dict, fontsize=48):
