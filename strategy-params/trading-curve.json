@@ -1,1 +1,1 @@
-{"risk": 0.01, "winrate": 0.34, "r2r": 2.1, "n": 1000, "cn": 10, "fee": 0.002, "slippage": 0.001}
+{"risk": 0.01, "winrate": 0.4, "r2r": 2.5, "n": 600, "cn": 4, "fee": 0.002, "slippage": 0.001, "seed": 0}
