@@ -35,9 +35,10 @@ def load_candles(exchange, pair, timeframe):
     odf = pd.read_json(f'../../freq-user-data/data/{exchange}/{pair}-{timeframe}.json').dropna()
     odf.columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
 
-    odf['date'] = pd.to_datetime(odf['timestamp'], unit='ms', utc=False)
-    odf['idate'] = odf.date.dt.strftime('%Y%m%d')
-    odf.set_index(pd.DatetimeIndex(odf["date"]), inplace=True, drop=True)
+    odf['dtime'] = pd.to_datetime(odf['timestamp'], unit='ms', utc=False)
+    # odf['idate'] = odf.date.dt.strftime('%Y%m%d')
+    odf.set_index('dtime', inplace=True, drop=True)
+
     odf = odf.sort_index()
     return odf
 
@@ -63,8 +64,8 @@ def identify_axes(ax_dict, fontsize=48):
 
 
 def plot_candles(wdf, ax=None, kwargs={}):
-    # if ax is None:
-    #     fig, ax = plt.subplots(**kwargs)
+    if ax is None:
+        fig, ax = plt.subplots(**kwargs)
 
     up, down = wdf[wdf.close >= wdf.open], wdf[wdf.close < wdf.open]
     col1,col2 = 'green','red'
@@ -209,3 +210,17 @@ def fu_printer(odf, strategy, strategy_params = {}, indicator_func = None, signa
         });
     x = display(ui, out);
 
+def flatten_past_n(odf, nper=None):
+# plen = 6 * 2
+    # if columns is None: columns = odf.columns.tolist()
+    pcols = [f'{c}_L{nper-j}' for c in odf.columns for j in range(nper)]
+    fdf = pd.DataFrame([
+        (
+            odf.iloc[i-nper:i].values.flatten()
+        )
+        #.shape
+        for prange in [range(nper,odf.shape[0])]
+        for i in prange
+    ], index=odf.index.values[nper:]).set_axis(pcols, axis=1)
+
+    return fdf
