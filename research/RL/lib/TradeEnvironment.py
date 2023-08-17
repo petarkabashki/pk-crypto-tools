@@ -54,14 +54,23 @@ class TradeEnvironment(BaseEnvironment):
 
 
         current_hidden_ = self.hidden_states.iloc[self.current_t, :]
-
+        r2r = 0.5
+        target = 0.05
         reward = 0
         if action == 0:
             reward = 0
         else:
             action_dir = 1 if action == 1 else -1
-            # reward = -1 +  2*(current_hidden_.cdir == action_dir)
-            reward = np.log(current_hidden_.close / current_hidden_.open) * action_dir
+            if action_dir == 1:
+                reward = int(current_hidden_.fu_max_ret > target) + int(current_hidden_.fu_min_ret > -target * r2r)
+            elif action_dir == -1:
+                reward = int(current_hidden_.fu_min_ret < -target) + int(current_hidden_.fu_max_ret < target * r2r)
+
+            # lret = np.log(current_hidden_.close / current_hidden_.open) * action_dir 
+            # reward = int(lret > 0.05)
+            # reward = (lret > 0.01) - 2 * (lret < 0) * abs(lret)
+            # reward = -1 +  2*(current_hidden_.cdir == action_dir) + int(lret > 0.01)
+            # reward = np.log(current_hidden_.close / current_hidden_.open) * action_dir - 0.002
 
         self.current_t += 1
         self.current_state = self.obs_states[self.current_t]        

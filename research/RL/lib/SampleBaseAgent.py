@@ -5,7 +5,6 @@ from abc import abstractmethod
 
 class SampleBaseAgent(BaseAgent):
 
-    # _q = None
     def __init__(self):
         self._q = None
 
@@ -102,3 +101,14 @@ class SampleBaseAgent(BaseAgent):
         """
         if self.is_training__:
             self.agent_end_update(reward)
+
+    
+    def agent_message(self, message):
+        """A function used to pass information from the agent to the experiment.
+        Args:
+            message: The message passed to the agent.
+        Returns:
+            The response (or answer) to the message.
+        """
+        if message == 'get q':
+            return self._q
