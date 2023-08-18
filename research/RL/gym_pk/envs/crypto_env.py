@@ -69,16 +69,17 @@ class CryptoEnv(gym.Env):
             step_reward = 0
         else:
             action_dir = 1 if action == 1 else -1
-            if action_dir == 1:
-                step_reward = int(current_future_prices.fu_max_ret > target) + int(current_future_prices.fu_min_ret > -target * r2r)
-            elif action_dir == -1:
-                step_reward = int(current_future_prices.fu_min_ret < -target) + int(current_future_prices.fu_max_ret < target * r2r)
+            # if action_dir == 1:
+            #     step_reward = int(current_future_prices.fu_max_ret > target) + int(current_future_prices.fu_min_ret > -target * r2r)
+            # elif action_dir == -1:
+            #     step_reward = int(current_future_prices.fu_min_ret < -target) + int(current_future_prices.fu_max_ret < target * r2r)
 
             # lret = np.log(current_hidden_.close / current_hidden_.open) * action_dir 
             # reward = int(lret > 0.05)
             # reward = (lret > 0.01) - 2 * (lret < 0) * abs(lret)
             # reward = -1 +  2*(current_hidden_.cdir == action_dir) + int(lret > 0.01)
-            # reward = np.log(current_hidden_.close / current_hidden_.open) * action_dir - 0.002
+            step_reward = (current_future_prices.close_ret * action_dir - 0.002) * 100
+            # step_reward = (1 - 2 * (current_future_prices.close_ret < 0) )* action_dir
 
         self._current_tick += 1
 
