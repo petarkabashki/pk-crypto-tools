@@ -4,23 +4,22 @@ from __future__ import annotations
 from collections import defaultdict
 
 import numpy as np
-from gymnasium import spaces
+
 # import gymnasium as gym
 
 
-class QAgent:
+class TD_0_Agent:
 
-    algo = 'QLearning'
+    algo = 'TD(0)'
 
     def __init__(
         self,
-        action_space: spaces.Space,
         learning_rate: float,
         initial_epsilon: float,
         epsilon_decay: float,
         final_epsilon: float,
         discount_factor: float = 0.95,
-        
+        action_space = None
     ):
         """Initialize a Reinforcement Learning agent with an empty dictionary
         of state-action values (q_values), a learning rate and an epsilon.

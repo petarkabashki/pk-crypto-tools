@@ -35,7 +35,7 @@ class TradingEnv(gym.Env):
 
         # spaces
         self.action_space = spaces.Discrete(len(Actions))
-        INF = 1e10
+        INF = 1e10(sel_action -2*(sel_action == 2))
         self.observation_space = spaces.Box(low=-INF, high=INF, shape=self.shape, dtype=np.float64)
 
         # episode

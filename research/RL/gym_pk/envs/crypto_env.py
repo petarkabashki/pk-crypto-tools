@@ -9,16 +9,16 @@ from sklearn import preprocessing
 
 class CryptoEnv(gym.Env):
 
-    def __init__(self, prices, signal_features, future_prices, render_mode=None):
+    def __init__(self, window_size, df, state_features, future_prices, observation_space, render_mode=None):
         
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
-        self.prices = prices
-        self.state_features = signal_features
+        self.window_size = window_size
+        self.df = df
+        self.state_features = state_features
         self.future_prices = future_prices
 
-        self._start_tick = 0
-        self._end_tick = len(self.prices) - 1
+        # self._end_tick = len(self.prices) - 1
         self._terminated = None
         self._position_history = None
         self._total_reward = None
@@ -26,22 +26,19 @@ class CryptoEnv(gym.Env):
 
         self.trade_fee = 0.002  # unit
         self.action_space = spaces.Discrete(3)
+        self.observation_space = observation_space
 
-        le = preprocessing.LabelEncoder()
-        le_fits = [le.fit(signal_features[c]) for c in signal_features.columns]
-        le_dims = [le_.classes_.shape[0] for le_ in le_fits]
-        self.observation_space = Tuple([Discrete(n) for n in le_dims])
-
-        self.state_features = pd.DataFrame({
-                signal_features.columns[i] : le_fits[i].transform(signal_features.iloc[:,i]) for i in range(len(le_fits))
-            }, index=signal_features.index)
 
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
         self._terminated = False
+        
+        self._start_tick = np.random.randint(0, self.df.shape[0] - self.window_size )
+        self._end_tick = self._start_tick + self.window_size -1
         self._current_tick = self._start_tick
+
         # self._last_trade_tick = self._current_tick - 1
         # self._position_history = (self.window_size * [None]) + [self._position]
         self._total_reward = 0.
@@ -62,6 +59,7 @@ class CryptoEnv(gym.Env):
         self._terminated = False
 
         current_future_prices = self.future_prices.iloc[self._current_tick, :]
+        current = self.df.iloc[self._current_tick, :]
         r2r = 0.5
         target = 0.05
         step_reward = 0
@@ -76,10 +74,14 @@ class CryptoEnv(gym.Env):
 
             # lret = np.log(current_hidden_.close / current_hidden_.open) * action_dir 
             # reward = int(lret > 0.05)
-            # reward = (lret > 0.01) - 2 * (lret < 0) * abs(lret)
-            # reward = -1 +  2*(current_hidden_.cdir == action_dir) + int(lret > 0.01)
-            step_reward = (current_future_prices.close_ret * action_dir - 0.002) * 100
+            # if action_dir == 1:
+            #     step_reward = (np.exp(abs(current_future_prices.close_ret) + 1)) * action_dir
+            # elif action_dir == -1:
+            #     step_reward = (np.exp(abs(current_future_prices.close_ret) + 1)) * action_dir
+            # step_reward = -1 +  2*(current.cdir == action_dir) + int(current_future_prices.close_ret > 0.02)
+            step_reward = (current_future_prices.close_ret * action_dir - 0.002)
             # step_reward = (1 - 2 * (current_future_prices.close_ret < 0) )* action_dir
+
 
         self._current_tick += 1
 

@@ -1,26 +1,20 @@
 
-from __future__ import annotations
+# %%
+
 
 from collections import defaultdict
-
 import numpy as np
-from gymnasium import spaces
-# import gymnasium as gym
+from .base_agent import BaseAgent
 
-
-class QAgent:
-
-    algo = 'QLearning'
-
+class BlackjackAgent(BaseAgent):
     def __init__(
         self,
-        action_space: spaces.Space,
+        action_space,
         learning_rate: float,
         initial_epsilon: float,
         epsilon_decay: float,
         final_epsilon: float,
         discount_factor: float = 0.95,
-        
     ):
         """Initialize a Reinforcement Learning agent with an empty dictionary
         of state-action values (q_values), a learning rate and an epsilon.
@@ -33,7 +27,6 @@ class QAgent:
             discount_factor: The discount factor for computing the Q-value
         """
         self.action_space = action_space
-
         self.q_values = defaultdict(lambda: np.zeros(self.action_space.n))
 
         self.lr = learning_rate
@@ -44,6 +37,10 @@ class QAgent:
         self.final_epsilon = final_epsilon
 
         self.training_error = []
+
+
+    def start_episode(self):
+        pass
 
     def get_action(self, obs: tuple[int, int, bool]) -> int:
         """
