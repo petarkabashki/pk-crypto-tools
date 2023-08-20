@@ -9,11 +9,11 @@ from sklearn import preprocessing
 
 class CryptoEnv(gym.Env):
 
-    def __init__(self, window_size, df, state_features, future_prices, observation_space, render_mode=None):
+    def __init__(self, df, state_features, future_prices, observation_space, render_mode=None):
         
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
-        self.window_size = window_size
+        # self.window_size = window_size
         self.df = df
         self.state_features = state_features
         self.future_prices = future_prices
@@ -21,8 +21,8 @@ class CryptoEnv(gym.Env):
         # self._end_tick = len(self.prices) - 1
         self._terminated = None
         self._position_history = None
-        self._total_reward = None
-        self._total_profit = None
+        self._total_reward = 0
+        self._total_profit = 0
 
         self.trade_fee = 0.002  # unit
         self.action_space = spaces.Discrete(3)
@@ -34,9 +34,10 @@ class CryptoEnv(gym.Env):
         super().reset(seed=seed)
 
         self._terminated = False
-        
-        self._start_tick = np.random.randint(0, self.df.shape[0] - self.window_size )
-        self._end_tick = self._start_tick + self.window_size -1
+        self._start_tick = options['_start_tick']
+        self._end_tick = options['_end_tick']
+        # self._start_tick = np.random.randint(0, self.df.shape[0] - self.window_size )
+        # self._end_tick = self._start_tick + self.window_size -1
         self._current_tick = self._start_tick
 
         # self._last_trade_tick = self._current_tick - 1
@@ -78,9 +79,10 @@ class CryptoEnv(gym.Env):
             #     step_reward = (np.exp(abs(current_future_prices.close_ret) + 1)) * action_dir
             # elif action_dir == -1:
             #     step_reward = (np.exp(abs(current_future_prices.close_ret) + 1)) * action_dir
-            # step_reward = -1 +  2*(current.cdir == action_dir) + int(current_future_prices.close_ret > 0.02)
-            step_reward = (current_future_prices.close_ret * action_dir - 0.002)
-            # step_reward = (1 - 2 * (current_future_prices.close_ret < 0) )* action_dir
+            # step_reward = -1 +  2*(current.cdir == action_dir) + 3 * int(action_dir * current_future_prices.close_ret > 0.02)
+            # step_reward = 5 * int(action_dir * current_future_prices.close_ret > 0.02) - 1
+            # step_reward = (current_future_prices.close_ret * action_dir > 0.02) 
+            step_reward = current_future_prices.close_ret * action_dir
 
 
         self._current_tick += 1

@@ -70,7 +70,7 @@ class MonteCarloAgent(BaseAgent):
 
         # self.training_error = []
 
-    def start_episode(self):
+    def start_episode(self, obs):
         # print('Starting episode')
         self.episode = []
 

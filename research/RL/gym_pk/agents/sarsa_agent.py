@@ -49,15 +49,12 @@ class SarsaAgent:
         self.final_epsilon = aparams['final_epsilon']
         self.expected_sarsa = aparams['expected_sarsa']
         self.next_action = None
-        self.t = 0
-        # self.prev_action = 0
-        # self.prev_obs = 0
+        # self.t = 0
 
         self.training_error = []
 
-    def start_episode(self):
-        # self.prev_action = self.prev_obs = None
-        pass
+    def start_episode(self, obs):
+        self.next_action = self.calc_next_action(obs)
 
     def calc_next_action(self, obs):
         # with probability epsilon return a random action to explore the environment
@@ -74,11 +71,8 @@ class SarsaAgent:
         Returns the best action with probability (1 - epsilon)
         otherwise a random action with probability epsilon to ensure exploration.
         """
-        if self.next_action is None:
-            self.next_action = self.calc_next_action(obs)
-
+        # self.next_action = self.calc_next_action(obs)
         return self.next_action
-        
 
     def update(
         self,
@@ -89,33 +83,20 @@ class SarsaAgent:
         next_obs: tuple[int, int, bool],
     ):
         """Updates the Q-value of an action."""
-        #### Normal SARSA
-        # prev_q_value = self.q_values[self.prev_obs][self.prev_action]
-        # current_q_value = self.q_values[obs][action]
-        # temporal_difference = (
-        #     reward + self.gamma * current_q_value - prev_q_value
-        # )
-
-        # self.q_values[self.prev_obs][self.prev_action] = (
-        #     prev_q_value + self.alpha * temporal_difference
-        # )
-        # self.training_error.append(temporal_difference)
-
         if self.expected_sarsa:        
-            ## Expected Sarsa
+            ### Expected Sarsa
+            # Not needed here, but for compliance with Normal Sarsa's calculations
             self.next_action = self.calc_next_action(next_obs)
             next_q = self.q_values[next_obs]
             next_q_max = np.max(next_q)
-            pi = np.ones(self.action_space.n) * (self.epsilon / self.action_space.n)
-            pi += (next_q == next_q_max) * ((1 - self.epsilon) / np.sum(next_q == next_q_max))
-            expectation = np.sum(next_q * pi)
+            expectation = (1- self.epsilon) * next_q_max + self.epsilon * np.mean(next_q)
             self.q_values[obs][action] += self.alpha * (reward + self.gamma * expectation - self.q_values[obs][action])
-            # self.training_error.append(temporal_difference)
         else:
             ### Normal SARSA
-            self.next_action = self.calc_next_action(next_obs)
-            next_q = self.q_values[next_obs]
-            next_qval = self.q_values[next_obs][self.next_action]
+            next_qval = 0
+            if not terminated:
+                self.next_action = self.calc_next_action(next_obs)
+                next_qval = self.q_values[next_obs][self.next_action]
 
             qval = self.q_values[obs][action]
             temporal_difference = (
@@ -126,7 +107,6 @@ class SarsaAgent:
                 qval + self.alpha * temporal_difference
             )
             self.training_error.append(temporal_difference)
-        
 
         self.prev_action = action
         self.prev_obs = obs

@@ -49,7 +49,7 @@ class QAgent:
 
         self.training_error = []
 
-    def start_episode(self):
+    def start_episode(self, obs):
         pass
 
     def get_action(self, obs: tuple[int, int, bool]) -> int:
