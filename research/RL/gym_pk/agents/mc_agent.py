@@ -13,17 +13,18 @@ class MonteCarloAgent(BaseAgent):
     algo = 'Monte-Carlo'
 
     def _info(self):
-        return f'{self.algo}, first_visit:{self.first_visit}, exploring_starts:{self.exploring_starts_spec}, gamma:{self.gamma}'
+        return f'{self.algo}, first_visit:{self.first_visit}, exploring_starts_q:{self.exploring_starts_q}, gamma:{self.gamma}'
     
     def __init__(
         self,
         action_space: Space,
-        gamma,
-        initial_epsilon: float,
-        epsilon_decay: float,
-        final_epsilon: float,
-        first_visit: bool = True,
-        exploring_starts_q = None,
+        aparams = {},
+        # gamma,
+        # initial_epsilon: float,
+        # epsilon_decay: float,
+        # final_epsilon: float,
+        # first_visit: bool = True,
+        # exploring_starts_q = None,
 
         # learning_rate: float,
         # initial_epsilon: float,
@@ -43,20 +44,20 @@ class MonteCarloAgent(BaseAgent):
             discount_factor: The discount factor for computing the Q-value
         """
         super().__init__(action_space)
-        self.epsilon = initial_epsilon
-        self.epsilon_decay = epsilon_decay
-        self.final_epsilon = final_epsilon
-        self.first_visit = first_visit
-        self.exploring_starts_q = exploring_starts_q
-        self.gamma = gamma
+        self.epsilon = aparams['initial_epsilon']
+        self.epsilon_decay = aparams['epsilon_decay']
+        self.final_epsilon = aparams['final_epsilon']
+        self.first_visit = aparams['first_visit'] if 'first_visit' in aparams else True
+        self.exploring_starts_q = aparams['exploring_starts_q'] if 'exploring_starts_q' in aparams else None
+        self.gamma = aparams['gamma']
 
         self.N = defaultdict(lambda: np.zeros(self.action_space.n))
         # self.returns_sum = defaultdict(lambda: np.zeros(self.action_space.n))
         # self.action_space = action_space
         # self.q_values = {}
-        if exploring_starts_q is not None:
+        if self.exploring_starts_q is not None:
             # print('aaaaaaaa', exploring_starts_spec['q_value'])
-            self.q_values = defaultdict(lambda: np.full(self.action_space.n, exploring_starts_q))
+            self.q_values = defaultdict(lambda: np.full(self.action_space.n, self.exploring_starts_q))
         else:
             self.q_values = defaultdict(lambda: np.zeros(self.action_space.n))
 

@@ -7,14 +7,19 @@ import numpy as np
 from .base_agent import BaseAgent
 
 class BlackjackAgent(BaseAgent):
+    algo = "QLearning"
+    def _info(self):
+        return F"Blacjack QLearning: {self.aparams}"
+    
     def __init__(
         self,
         action_space,
-        learning_rate: float,
-        initial_epsilon: float,
-        epsilon_decay: float,
-        final_epsilon: float,
-        discount_factor: float = 0.95,
+        aparams,
+        # learning_rate: float,
+        # initial_epsilon: float = 1,
+        # epsilon_decay: float = 0.001,
+        # final_epsilon: float = 0.01,
+        # discount_factor: float = 0.95,
     ):
         """Initialize a Reinforcement Learning agent with an empty dictionary
         of state-action values (q_values), a learning rate and an epsilon.
@@ -26,15 +31,16 @@ class BlackjackAgent(BaseAgent):
             final_epsilon: The final epsilon value
             discount_factor: The discount factor for computing the Q-value
         """
+        self.aparams = aparams
         self.action_space = action_space
         self.q_values = defaultdict(lambda: np.zeros(self.action_space.n))
 
-        self.lr = learning_rate
-        self.discount_factor = discount_factor
+        self.lr = aparams['learning_rate']
+        self.discount_factor = aparams['discount_factor'] if 'discount_factor' in aparams else 0.95
 
-        self.epsilon = initial_epsilon
-        self.epsilon_decay = epsilon_decay
-        self.final_epsilon = final_epsilon
+        self.epsilon = aparams['initial_epsilon']
+        self.epsilon_decay = aparams['epsilon_decay']
+        self.final_epsilon = aparams['final_epsilon']
 
         self.training_error = []
 

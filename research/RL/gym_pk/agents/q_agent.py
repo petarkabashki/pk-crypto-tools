@@ -11,15 +11,18 @@ from gymnasium import spaces
 class QAgent:
 
     algo = 'QLearning'
+    def _info(self):
+        return F"{self.algo}: {self.aparams}"
 
     def __init__(
         self,
         action_space: spaces.Space,
-        learning_rate: float,
-        initial_epsilon: float,
-        epsilon_decay: float,
-        final_epsilon: float,
-        discount_factor: float = 0.95,
+        aparams,
+        # learning_rate: float,
+        # initial_epsilon: float,
+        # epsilon_decay: float,
+        # final_epsilon: float,
+        # gamma: float = 0.95,
         
     ):
         """Initialize a Reinforcement Learning agent with an empty dictionary
@@ -30,20 +33,24 @@ class QAgent:
             initial_epsilon: The initial epsilon value
             epsilon_decay: The decay for epsilon
             final_epsilon: The final epsilon value
-            discount_factor: The discount factor for computing the Q-value
+            gamma: The discount factor for computing the Q-value
         """
         self.action_space = action_space
+        self.aparams = aparams
 
         self.q_values = defaultdict(lambda: np.zeros(self.action_space.n))
 
-        self.lr = learning_rate
-        self.discount_factor = discount_factor
+        self.alpha = aparams['alpha']
+        self.gamma = aparams['gamma']
 
-        self.epsilon = initial_epsilon
-        self.epsilon_decay = epsilon_decay
-        self.final_epsilon = final_epsilon
+        self.epsilon = aparams['initial_epsilon']
+        self.epsilon_decay = aparams['epsilon_decay']
+        self.final_epsilon = aparams['final_epsilon']
 
         self.training_error = []
+
+    def start_episode(self):
+        pass
 
     def get_action(self, obs: tuple[int, int, bool]) -> int:
         """
@@ -69,11 +76,11 @@ class QAgent:
         """Updates the Q-value of an action."""
         future_q_value = (not terminated) * np.max(self.q_values[next_obs])
         temporal_difference = (
-            reward + self.discount_factor * future_q_value - self.q_values[obs][action]
+            reward + self.gamma * future_q_value - self.q_values[obs][action]
         )
 
         self.q_values[obs][action] = (
-            self.q_values[obs][action] + self.lr * temporal_difference
+            self.q_values[obs][action] + self.alpha * temporal_difference
         )
         self.training_error.append(temporal_difference)
 
