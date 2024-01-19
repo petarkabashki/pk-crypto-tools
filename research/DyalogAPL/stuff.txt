@@ -1,0 +1,14 @@
+
+
+json ← ⎕NGET '/media/grenada/Data/work/pk-crypto-tools/freq-user-data/data/binance/ETH_USDT-1w.json'
+jns ← ⎕JSON json 
+
+(⎕JSON⌹ 'Format' 'M') json
+
+
+(⎕JSON⍠'Format' 'M')json
+
+⎕CSV '/media/grenada/Data/work/pk-crypto-tools/research/J/BTC_USDT-1w.csv'
+
+
+data ← ⎕CSV '/media/grenada/Data/work/pk-crypto-tools/research/J/BTC_USDT-1w.csv'
