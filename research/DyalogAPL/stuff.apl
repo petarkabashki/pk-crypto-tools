@@ -219,12 +219,27 @@ fperstats← (⊢,⊃∘(,/(↓2 2⍴⍳4)((⊢÷+/)(⊂⊣)⌷(2⌷[2]⊢))¨�
 
 ⍝ in/out markers in matrix form
 ]display 33 14 (¯1 0 1) (fperstats ∘stinout∘ {⍵[;1] cbinout ⍵[;2]}∘ (sbin (⍉∘↑,⍥⊂) sbout ) {⍵[;4]} cbs {⍺[3]} muladd cematr )  1000↑ lk
+
+emastats ← (fperstats ∘stinout∘ {⍵[;1] cbinout ⍵[;2]}∘ (sbin (⍉∘↑,⍥⊂) sbout ) {⍵[;4]} cbs {⍺[3]} muladd cematr ) 
+]display 33 14 (¯1 0 1) emastats  5000↑ lk
 ⍝ plot some of it, price + bands
 ]plot pspl ((⍳≢),⊢) 200↑ ⊢ 26 14 (¯1 0 1) ( ⊢,{⍺[3]} muladd cematr )  1000↑ lk
 
 ⍝ cbands← (⊢, (⍉⍤↑(⊂1⌷[2]⊢)+¨ ((⌽∘-⊣),0,⊣)×¨(⊂2⌷[2]⊢)))
 
 ]display (((⌽0,-),⊢)1↓fibs)
+
+
+⍝ --- Calculate stats for all moving averages from 5 to 205
+desta ← {⍵ 14 (¯1 0 1) emastats 10000↑lk }¨ (5×⍳40)
+desta←↑desta
+
+⍝ --- Windowed statistics
+168 {n←⌊⍵÷⍺⋄⍺×¯1+⍳n} ≢lk
+desta← {45 14 (¯1 0 1) emastats ⊢ ⍵[2]↑⍵[1]↓lk }¨  ⊢ 168 {n←⌊⍵÷⍺⋄⍺,⍨¨⍺×¯1+⍳n} ≢lk
+desta←↑desta
+]plot pspl ((⍳≢),⊢) desta[;1 3;2]
+]plot pspl ((⍳≢),⊢) desta[;1 3;3]
 
 ⍝ -------------------------------------------------------------
 ⍝ -------------------------------------------------
