@@ -22,7 +22,7 @@ pspl←{(⊂↓∘⍉(1↓[2]⊢)⍵), ⊂,1↑[2]⍵}
 ⍝ --- Load candlesticks
 ⍝ ---
 fldb←'/media/grenada/Data/Accounting/pk-crypto-tax-calculator/data-csv/binance/'
-k←kload⊢fldb,'ALGO','_USDT-4h.csv'
+k←kload⊢fldb,'ALGO','_USDT-1h.csv'
 ]display 10↑ kl← ¯1↓[2] 1↓[2] k
 10↑ lk← ⍟ (⊂2 3 4 5)⌷[2] k ⍝ take log of ohlc
 
@@ -77,9 +77,9 @@ py.Exec 'import pandas_ta as ta'
 ⍝ ------------------------------------------------------------
 
 
-14   {⍵[;2 3], ¯1⌽⍵[;4]}  20↑lk
-]display   ⍉|↑{(⊂-/⍵[;,1 2]), (⊂-/⍵[;1 3]), (⊂-/⍵[;2 3])} {⍵[;2 3], ¯1⌽⍵[;4]}  20↑lk
-]display   ((⊂1 2) (⊂1 3) (⊂2 3)) (⊣⌷⊢)¨ ⊂{⍵[;2 3], ¯1⌽⍵[;4]}  20↑lk
+⍝ 14   {⍵[;2 3], ¯1⌽⍵[;4]}  20↑lk
+⍝ ]display   ⍉|↑{(⊂-/⍵[;,1 2]), (⊂-/⍵[;1 3]), (⊂-/⍵[;2 3])} {⍵[;2 3], ¯1⌽⍵[;4]}  20↑lk
+⍝ ]display   ((⊂1 2) (⊂1 3) (⊂2 3)) (⊣⌷⊢)¨ ⊂{⍵[;2 3], ¯1⌽⍵[;4]}  20↑lk
 ⍝ --- True range
 ⍝ tr←{⌈/|(-/⍵[;2 3]),⍵[;2 3]-[1]0,1↓⍵[;4]} 
 ⍝ --- ATR
@@ -120,30 +120,29 @@ atr ← (rma∘tr)
 ⍝ --- Check if EMAs act as support
 ⍝ ------------------------------------------------------------
 
-]display ¯10↑¨ dband← 26 14 (¯1 0 1)({(1,⊢)¨⊃⍺[3]} {⍺(⊃+.×)¨⊂⍵}  {⍺[1] ema ⍵[;4]} (,⍥⊂) {⍺[2] atr ⍵} ) lk 
-]plot pspl 400↑ (⍳≢k),(lk[;4 3 2],⍉↑dband)  
+⍝ ]display ¯10↑¨ dband← 26 14 (¯1 0 1)({(1,⊢)¨⊃⍺[3]} {⍺(⊃+.×)¨⊂⍵}  {⍺[1] ema ⍵[;4]} (,⍥⊂) {⍺[2] atr ⍵} ) lk 
+⍝ ]plot pspl 400↑ (⍳≢k),(lk[;4 3 2],⍉↑dband)  
 
 ⍝ --- caluclates on which side of the band the price is
 cbs← { (×⍺-⊃⍵[2])×(⍺>⊃⍵[3])∨(⍺<⊃⍵[1])}
-]]display  ¯50↑ bs← (lk[;4]) cbs dband
-
+⍝ ]]display  ¯50↑ bs← (lk[;4]) cbs dband
 cbin←((0,(1∘↓))(0≠¯1∘⌽)∧(0∘=))
 ⍝ signed 
 sbin← {pr←¯1⌽⍵⋄0,1↓pr×(⍵=0)∧(pr≠0)}  
 sbout← {pr←¯1⌽⍵⋄0,1↓⍵×(⍵≠0)∧(pr=0)}
-
 ⍝ --- makes a list of in-outs
-cdbinout← ((¯1∘↓)((0∘≠⊢⍤/⊢)⊣)(((0∘≠)⊢⍤/⊢),)¨(0≠⊣)⊂⊢)
-⍝ 3↑ dbin cdbinout dbout
-⍝ leave only in and out markers
-⍝ 3↑ ((0∘≠)⊢⍤/⊢)¨ dbinout
-
+cdbinout← ((¯1∘↓)((0∘≠⊢⍤/⊢)⊣) (((0∘≠)⊢⍤/⊢),)¨(0≠⊣)⊂⊢)
 ⍝ --- counts of in and out  in specific order
 stinout← {{⍺ (¯1+≢⍵)}⌸ (4 2 ⍴1 1 1 ¯1 ¯1 ¯1 ¯1 1)⍪ ↑ ((0∘≠)⊢⍤/⊢)¨ ¯1↓ ⍵}
 ⍝ --- add fractions
 cfsta← (,∘((⊢÷+/)(2⌷[2]⊢)))⍨ 
 ⍝ --- add fractions per in-band type +/-1
 fperstats← (⊢,⊃∘(,/(↓2 2⍴⍳4)((⊢÷+/)(⊂⊣)⌷(2⌷[2]⊢))¨⊂))
+
+⍝ 3↑ dbin cdbinout dbout
+⍝ leave only in and out markers
+⍝ 3↑ ((0∘≠)⊢⍤/⊢)¨ dbinout
+
 ]display stinout (sbin cdbinout sbout) bs
 ]display stinout dbinout
 
@@ -171,6 +170,8 @@ festa ← ↑fperstats¨ desta
 ⍝ --- fixing ema 33, chosing different band widths * atr
 ⍝ ------------------------------------------------------------
 
+⍝ --- FIBS
+]display fibs← 0,,(⍳5){⍺∘.+⍵} .272 .414 .5 .618 .786 1
 ⍝ --- make bands
 ]display abands ← (-,0,⊢)¨ ,0 1 2{⍺∘.+⍵} .272 .414 .5 .618 .786 1
 ⍝ calculate stats
@@ -188,6 +189,42 @@ festa ← ↑fperstats¨ desta
 cwnd ← {n←⌊(≢⍵)÷⍺[1]⋄ixs←(⍺[1])(⊢+∘⍳⊣)¨⊢⍺[1]×¯1+⍳n⋄ixs ((⊂⊣)⌷⊢)¨ ⊂⍵}
 ]display 13 0.5 cwnd 10×⍳100
 
+ 33 14 (¯1 0 1) ((stinout (sbin cdbinout sbout)) {⍵[;4]} cbs {(1,⊢)¨⊃⍺[3]} {⍺(⊃+.×)¨⊂⍵}  {⍺[1] ema ⍵[;4]} (,⍥⊂) {⍺[2] atr ⍵} )  lk
+
+
+⍝ -------------------------------------------------------------
+⍝ -------------------------------------------------------------
+⍝  Multiple bands, matrix form throughout
+⍝ 
+⍝ Fibs
+⍝ ]display fibs← 0,,(⍳5){⍺∘.+⍵} .272 .414 .5 .618 .786 1
+]display fibs← 0 .272 0.5 .618 1 1.618 2 2.618 3 3.618 4 5 6
+⍝ fib levels -/0/+
+]display blevels ← ((⌽0,-),⊢)1↓fibs
+⍝ ]display blevels ← ((⌽0,-),⊢) ⊢ 0 .272 0.5 .618 1 1.618 2 2.618 3 
+⍝ Calculates bands from fibs and aNx2 matrix
+muladd ← (↑(1⌷[2]⊢)+⊣×2⌷[2]⊢)
+⍝ Calculates ema and atr
+cematr ← (⍉∘↑{⍺[1] ema ⍵[;4]} (,⍥⊂) {⍺[2] atr ⍵})
+sbin← {pr←¯1⌽⍵⋄0,1↓pr×(⍵=0)∧(pr≠0)}  
+sbout← {pr←¯1⌽⍵⋄0,1↓⍵×(⍵≠0)∧(pr=0)}
+⍝ example lines and plot
+filines← 33 14 blevels ( (3⌷⊣) muladd cematr) ⊢ 200↑lk
+]plot pspl ((⍳≢),⊢) (200↑lk),filines
+
+cbs← {(×⍺-⍵[;2])×(⍺<⍵[;1])∨⍺>⍵[;3]}
+cbinout←( ((0∘≠⊢⍤/⊢)⊣) (((0∘≠)⊢⍤/⊢),)¨ (0≠⊣)⊂⊢)
+⍝ --- add fractions per in-band type +/-1
+fperstats← (⊢,⊃∘(,/(↓2 2⍴⍳4)((⊢÷+/)(⊂⊣)⌷(2⌷[2]⊢))¨⊂))
+
+⍝ in/out markers in matrix form
+]display 33 14 (¯1 0 1) (fperstats ∘stinout∘ {⍵[;1] cbinout ⍵[;2]}∘ (sbin (⍉∘↑,⍥⊂) sbout ) {⍵[;4]} cbs {⍺[3]} muladd cematr )  1000↑ lk
+⍝ plot some of it, price + bands
+]plot pspl ((⍳≢),⊢) 200↑ ⊢ 26 14 (¯1 0 1) ( ⊢,{⍺[3]} muladd cematr )  1000↑ lk
+
+⍝ cbands← (⊢, (⍉⍤↑(⊂1⌷[2]⊢)+¨ ((⌽∘-⊣),0,⊣)×¨(⊂2⌷[2]⊢)))
+
+]display (((⌽0,-),⊢)1↓fibs)
 
 ⍝ -------------------------------------------------------------
 ⍝ -------------------------------------------------
