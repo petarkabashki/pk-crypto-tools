@@ -120,24 +120,77 @@ atr ← (rma∘tr)
 ⍝ --- Check if EMAs act as support
 ⍝ ------------------------------------------------------------
 
-20↑ aaa← 14 atr lk
-ea ← 50 ema lk[;4]
-⍝ band ema +- atr
-10↑⍉ ba← ea (-⍪[0.5]+) aaa
-⍝ band side of price: -1,0,+1
-100↑ bs← (×lk[;4]-ea)×(lk[;4]<ba[1;])∨(lk[;4]>ba[2;])
-⍝ getting into and out of the band
-100↑ bin← 0,1↓(0≠¯1⌽bs)∧(0=bs)
-100↑ bout← 0,1↓(0=¯1⌽bs)∧(0≠bs)
+]display ¯10↑¨ dband← 26 14 (¯1 0 1)({(1,⊢)¨⊃⍺[3]} {⍺(⊃+.×)¨⊂⍵}  {⍺[1] ema ⍵[;4]} (,⍥⊂) {⍺[2] atr ⍵} ) lk 
+]plot pspl 400↑ (⍳≢k),(lk[;4 3 2],⍉↑dband)  
 
-⍝ plot ema, band and ohlc
-]plot pspl 400↑ (⍳≢k),(lk[;4 3 2],⍉ba),ea 
+⍝ --- caluclates on which side of the band the price is
+cbs← { (×⍺-⊃⍵[2])×(⍺>⊃⍵[3])∨(⍺<⊃⍵[1])}
+]]display  ¯50↑ bs← (lk[;4]) cbs dband
+
+cbin←((0,(1∘↓))(0≠¯1∘⌽)∧(0∘=))
+⍝ signed 
+sbin← {pr←¯1⌽⍵⋄0,1↓pr×(⍵=0)∧(pr≠0)}  
+sbout← {pr←¯1⌽⍵⋄0,1↓⍵×(⍵≠0)∧(pr=0)}
+
+⍝ --- makes a list of in-outs
+cdbinout← ((¯1∘↓)((0∘≠⊢⍤/⊢)⊣)(((0∘≠)⊢⍤/⊢),)¨(0≠⊣)⊂⊢)
+⍝ 3↑ dbin cdbinout dbout
+⍝ leave only in and out markers
+⍝ 3↑ ((0∘≠)⊢⍤/⊢)¨ dbinout
+
+⍝ --- counts of in and out  in specific order
+stinout← {{⍺ (¯1+≢⍵)}⌸ (4 2 ⍴1 1 1 ¯1 ¯1 ¯1 ¯1 1)⍪ ↑ ((0∘≠)⊢⍤/⊢)¨ ¯1↓ ⍵}
+⍝ --- add fractions
+cfsta← (,∘((⊢÷+/)(2⌷[2]⊢)))⍨ 
+⍝ --- add fractions per in-band type +/-1
+fperstats← (⊢,⊃∘(,/(↓2 2⍴⍳4)((⊢÷+/)(⊂⊣)⌷(2⌷[2]⊢))¨⊂))
+]display stinout (sbin cdbinout sbout) bs
+]display stinout dbinout
+
+⍝ --- calculates it all, cum stats for in/out of band
+⍝ ]display dst← 26 14 (¯1 0 1)((cfsta ∘ stinout (sbin cdbinout sbout)) {⍵[;4]} cbs {(1,⊢)¨⊃⍺[3]} {⍺(⊃+.×)¨⊂⍵}  {⍺[1] ema ⍵[;4]} (,⍥⊂) {⍺[2] atr ⍵} ) lk 
+
+emastats ← ((stinout (sbin cdbinout sbout)) {⍵[;4]} cbs {(1,⊢)¨⊃⍺[3]} {⍺(⊃+.×)¨⊂⍵}  {⍺[1] ema ⍵[;4]} (,⍥⊂) {⍺[2] atr ⍵} )  
+
+⍝ --------------------------------------
+⍝ --- Stats for emas with different lengths
+⍝ 
+⍝ --- Calculate stats for all moving averages from 5 to 205
+desta ← {⍵ 14 (¯1 0 1) emastats lk }¨ (5×⍳40)
+⍝ --- Add fractions
+festa ← ↑fperstats¨ desta
+⍝ ((¯1∘↑⍤⍸0∘≠)↑⊢)
+⍝ -- Plot bounce-back ratio for up/down moves into the band
+]plot pspl ((5∘×∘⍳≢),⊢) festa[;1 3;2]
+
+⍝ -- Plot number of winning cases
+]plot pspl ((5∘+∘⍳≢),⊢) festa[;1 3;2]
 
 ⍝ ------------------------------------------------------------
 ⍝ ------------------------------------------------------------
-⍝ --- 
+⍝ --- fixing ema 33, chosing different band widths * atr
 ⍝ ------------------------------------------------------------
 
+⍝ --- make bands
+]display abands ← (-,0,⊢)¨ ,0 1 2{⍺∘.+⍵} .272 .414 .5 .618 .786 1
+⍝ calculate stats
+desta ← {33 14 ⍵ emastats lk }¨ abands
+festa ← ↑fperstats¨ desta
+]plot pspl ((⍳≢),⊢) festa[;1 3;3]
+⍝ -- Plot number of winning cases
+]plot pspl ((⍳≢),⊢) festa[;1 3;2]
+
+⍝ ------------------------------------------------------------
+⍝ ------------------------------------------------------------
+⍝ --- Rolling window stats
+⍝ ------------------------------------------------------------
+⍝ --- cut into windows
+cwnd ← {n←⌊(≢⍵)÷⍺[1]⋄ixs←(⍺[1])(⊢+∘⍳⊣)¨⊢⍺[1]×¯1+⍳n⋄ixs ((⊂⊣)⌷⊢)¨ ⊂⍵}
+]display 13 0.5 cwnd 10×⍳100
+
+
+⍝ -------------------------------------------------------------
+⍝ -------------------------------------------------
 ⍝ --- prepends the SMA for the first n after removing them; calculates the alpha and 1-alpha
 4 ((((⊢,1∘-)⍤(2÷1+⊣))),  (+/÷≢)⍤↑,↓) ⊢ 20↑ kl[;4]
 ⍝ --- prepends the aaverage n-1
