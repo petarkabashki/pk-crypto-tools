@@ -22,7 +22,7 @@ pspl←{(⊂↓∘⍉(1↓[2]⊢)⍵), ⊂,1↑[2]⍵}
 ⍝ --- Load candlesticks
 ⍝ ---
 fldb←'/media/grenada/Data/Accounting/pk-crypto-tax-calculator/data-csv/binance/'
-k←kload⊢fldb,'ALGO','_USDT-1h.csv'
+k←kload⊢fldb,'ALGO','_USDT-1d.csv'
 ]display 10↑ kl← ¯1↓[2] 1↓[2] k
 10↑ lk← ⍟ (⊂2 3 4 5)⌷[2] k ⍝ take log of ohlc
 
@@ -195,6 +195,8 @@ cwnd ← {n←⌊(≢⍵)÷⍺[1]⋄ixs←(⍺[1])(⊢+∘⍳⊣)¨⊢⍺[1]×¯
 ⍝ -------------------------------------------------------------
 ⍝ -------------------------------------------------------------
 ⍝  Multiple bands, matrix form throughout
+⍝ -------------------------------------------------------------
+⍝ -------------------------------------------------------------
 ⍝ 
 ⍝ Fibs
 ⍝ ]display fibs← 0,,(⍳5){⍺∘.+⍵} .272 .414 .5 .618 .786 1
@@ -216,6 +218,7 @@ cbs← {(×⍺-⍵[;2])×(⍺<⍵[;1])∨⍺>⍵[;3]}
 cbinout←( ((0∘≠⊢⍤/⊢)⊣) (((0∘≠)⊢⍤/⊢),)¨ (0≠⊣)⊂⊢)
 ⍝ --- add fractions per in-band type +/-1
 fperstats← (⊢,⊃∘(,/(↓2 2⍴⍳4)((⊢÷+/)(⊂⊣)⌷(2⌷[2]⊢))¨⊂))
+stinout← {{⍺ (¯1+≢⍵)}⌸ (4 2 ⍴1 1 1 ¯1 ¯1 ¯1 ¯1 1)⍪ ↑ ((0∘≠)⊢⍤/⊢)¨ ¯1↓ ⍵}
 
 ⍝ in/out markers in matrix form
 ]display 33 14 (¯1 0 1) (fperstats ∘stinout∘ {⍵[;1] cbinout ⍵[;2]}∘ (sbin (⍉∘↑,⍥⊂) sbout ) {⍵[;4]} cbs {⍺[3]} muladd cematr )  1000↑ lk
@@ -233,13 +236,109 @@ emastats ← (fperstats ∘stinout∘ {⍵[;1] cbinout ⍵[;2]}∘ (sbin (⍉∘
 ⍝ --- Calculate stats for all moving averages from 5 to 205
 desta ← {⍵ 14 (¯1 0 1) emastats 10000↑lk }¨ (5×⍳40)
 desta←↑desta
+]plot pspl ((⍳≢),⊢) desta[;1 3;2]
+]plot pspl ((⍳≢),⊢) desta[;1 3;3]
 
+⍝ --------------------------------------
 ⍝ --- Windowed statistics
-168 {n←⌊⍵÷⍺⋄⍺×¯1+⍳n} ≢lk
-desta← {45 14 (¯1 0 1) emastats ⊢ ⍵[2]↑⍵[1]↓lk }¨  ⊢ 168 {n←⌊⍵÷⍺⋄⍺,⍨¨⍺×¯1+⍳n} ≢lk
+(2×168) {n←⌊⍵÷⍺⋄⍺×¯1+⍳n} ≢lk
+desta← {45 14 (¯.786 0 .786) emastats ⊢ ⍵[2]↑⍵[1]↓lk }¨  ⊢ 168 {n←⌊⍵÷⍺⋄⍺,⍨¨⍺×¯1+⍳n} ≢lk
 desta←↑desta
 ]plot pspl ((⍳≢),⊢) desta[;1 3;2]
 ]plot pspl ((⍳≢),⊢) desta[;1 3;3]
+
+⍝ --- for different bands 
+
+⍝ --- FIBS
+]display fibs← 0,,(⍳5){⍺∘.+⍵} .272 .414 .5 .618 .786 1
+⍝ --- make bands
+]display abands ← (-,0,⊢)¨ ,0 1 2{⍺∘.+⍵} .272 .414 .5 .618 .786 1
+⍝ calculate stats
+desta ← {100 14 ⍵ emastats lk }¨ abands
+festa ← ↑fperstats¨ desta
+]plot pspl ((⍳≢),⊢) festa[;1 3;3]
+⍝ -- Plot number of winning cases
+]plot pspl ((⍳≢),⊢) festa[;1 3;2]
+
+
+⍝ -------------------------------------
+⍝ -------------------------------------
+⍝ ------ Detailed analysis
+
+
+⍝ -------------------------------------
+⍝ positions of in and out bounces
+cioidxs←(⍉⍤↑⍤(⍸¨⍤|↓[1]))
+⍝ in/out markers with positions
+]display  10↑ dioxs ← 50 14 (¯1 0 1) ((⊢ {⍺[⍵[;,1];1],⍺[⍵[;,2];2],⍵} (¯1↓cioidxs))⍤(sbin (⍉∘↑,⍥⊂) sbout) {⍵[;4]} cbs {⍺[3]} muladd cematr )  lk
+⍝ Grouped by IN/OUT marker
+]display  ↑{⍵[1], ≢⊃⍵[2]}¨ ↓⊢ dgioxs←((4 2⍴1 1 ¯1 ¯1 1 ¯1 ¯1 1)⍪dioxs[;1 2]) {⍺ (1↓⍵)}⌸((4 2⍴0)⍪dioxs[;3 4])
+⍝ show in/out markers order
+]display dgioxs[;1]
+
+⍝ number of bounce-backs vs continuations
+]display  {⍺(≢⍵)}⌸{⍵[;1]×⍵[;2]} dioxs
+
+
+⍝ ]display  ↑{⍵[1], ≢⊃⍵[2]}¨ ↓⊢ dgioxs←((4 2⍴1 1 ¯1 ¯1 1 ¯1 ¯1 1)⍪dioxs[;1 2]) {⍺ (1↓⍵)}⌸((4 2⍴0)⍪dioxs[;3 4])
+
+
+⍝ grouped by in/out, ordered groups
+]display  50 14 (¯1 0 1) ( {((↓4 2⍴1 1 ¯1 ¯1 1 ¯1 ¯1 1)⍪⍵[;1]) {⍺ (1↓⍵)}⌸((4 2⍴0)⍪⍵[;2 3])}∘ ({⍵[;1] cbinout ⍵[;2]}, (¯1↓cioidxs))∘(sbin (⍉∘↑,⍥⊂) sbout) {⍵[;4]} cbs {⍺[3]} muladd cematr )  500↑ lk
+
+⍝ In/out indexes
+]display 10↑ dioidxs ←  50 14 (¯1 0 1) ( (¯1↓cioidxs)⍤(sbin (⍉∘↑,⍥⊂) sbout) {⍵[;4]} cbs {⍺[3]} muladd cematr )  lk
+
+
+iogr ←  50 14 (¯1 0 1) ( {((↓4 2⍴1 1 ¯1 ¯1 1 ¯1 ¯1 1)⍪⍵[;1]) {⍺ (1↓⍵)}⌸((4 2⍴0)⍪⍵[;2 3])}∘ ({⍵[;1] cbinout ⍵[;2]}, (¯1↓cioidxs))∘(sbin (⍉∘↑,⍥⊂) sbout) {⍵[;4]} cbs {⍺[3]} muladd cematr )  lk
+
+
+
+
+⍝ -------------------------------------------------------------
+⍝ -------------------------------------------------------------
+⍝  Directional Change / ZigZag Algorythm
+⍝ -------------------------------------------------------------
+⍝ -------------------------------------------------------------
+⍝ 
+⍝ 
+
+]plot pspl ((⍳≢),⊢) lk
+
+⍝ --- ZigZag with running extrema
+]display 30↑ lk[;,4], xp← ⊢ 0.1 ({⍵,(|⍵[;2])×¯1⌽⍵[;3]}⍤↑⍤⌽⍤⊃⍤{qdc←⍺⋄ {(dir evdc ex)←⊃⍵⋄nex←dir×⌈/dir×(ex ⍺)⋄qdc<dir×ex-⍺:(⊂(-dir) dir ⍺),⍵ ⋄(⊂dir 0 nex),⍵} / ⍵} ∘(⌽(⊂∘⊂(1,1),(1∘↑⊢)),(1↓⊢))) ⊢ lk[;4]
+
+
+⍝ ---Take number of bars for each extrema
+]display {(≢⍵), ¯1↑⍵}¨ {(1++\|⍵[;2])⊆⍵[;4]}  20↑xp
+⍝ --- Number of bars, extrema price, previous extrema price
+]display 10↑ {⍵,¯1⌽⍵[;2]} ↑{(≢⍵),¯1↑⍵}¨ {(1++\|⍵[;2])⊆⍵[;4]}  xp
+
+
+⍝ --- ZigZag as per neurotrader
+]display 20↑ xtr← 0.1 ( (↑∘⌽∘⊃)⍤{qdc←⍺⋄⊃{(ax (dir xi xp))←⍵⋄(i p)←⍺⋄0<dir×p-xp:(ax (dir i p))⋄qdc<dir×xp-p:(((⊂i xi xp),ax) ((-dir) i p))⋄⍵} / ⍵}∘{⌽(⊂((⊂⍬), ⊂1,1, 2⌷⊃⍵)),1↓⍵}∘↓) ⊢ ((⍳∘≢),⊢) lk[;,4]
+
+
+⍝ --- Extrapolate extremas
+]display 10↑ xpol←   {⊃,/⍵[;1]+⍵[;3]×¯1+⍳¨⍵[;2]} {x←⍵[;3 2]⋄z←(1⊖x)-x⋄d←÷/z⋄¯1↓⍵[;,3],z[;,2],d}  xtr
+⍝ Plot extremas and price
+]plot pspl ((⍳≢),⊢) 200↑ ((≢xpol)↑lk[;,4]),xpol
+
+
+
+⍝ ]display  20↑ xp, xtxp← ⊃,/{⍵[;2]+⍵[;4]×¨(¯1+⍳)¨⍵[;1]} {⍵, (⍵[;2]-⍵[;3])÷⍵[;1]} {⍵,¯1⌽⍵[;2]} ↑{(≢⍵),¯1↑⍵}¨ {(1++\|⍵[;2])⊆⍵[;4]}  xp
+
+
+
+⍝ --- Plot price and extremas 
+]plot pspl ((⍳≢),⊢) 200↑ lk[;,4],xp[;3]
+
+⍝ 
+⍝ 
+⍝ 
+
+
+
 
 ⍝ -------------------------------------------------------------
 ⍝ -------------------------------------------------
