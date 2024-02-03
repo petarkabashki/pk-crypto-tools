@@ -22,7 +22,7 @@ pspl←{(⊂↓∘⍉(1↓[2]⊢)⍵), ⊂,1↑[2]⍵}
 ⍝ --- Load candlesticks
 ⍝ ---
 fldb←'/media/grenada/Data/Accounting/pk-crypto-tax-calculator/data-csv/binance/'
-k←kload⊢fldb,'ALGO','_USDT-1d.csv'
+k←kload⊢fldb,'ALGO','_USDT-4h.csv'
 ]display 10↑ kl← ¯1↓[2] 1↓[2] k
 10↑ lk← ⍟ (⊂2 3 4 5)⌷[2] k ⍝ take log of ohlc
 
@@ -308,19 +308,20 @@ iogr ←  50 14 (¯1 0 1) ( {((↓4 2⍴1 1 ¯1 ¯1 1 ¯1 ¯1 1)⍪⍵[;1]) {⍺
 ⍝ --- ZigZag with running extrema
 ]display 30↑ lk[;,4], xp← ⊢ 0.1 ({⍵,(|⍵[;2])×¯1⌽⍵[;3]}⍤↑⍤⌽⍤⊃⍤{qdc←⍺⋄ {(dir evdc ex)←⊃⍵⋄nex←dir×⌈/dir×(ex ⍺)⋄qdc<dir×ex-⍺:(⊂(-dir) dir ⍺),⍵ ⋄(⊂dir 0 nex),⍵} / ⍵} ∘(⌽(⊂∘⊂(1,1),(1∘↑⊢)),(1↓⊢))) ⊢ lk[;4]
 
+⍝ --- Plot price and extremas 
+]plot pspl ((⍳≢),⊢) 200↑ lk[;,4],xp[;3]
+
 
 ⍝ ---Take number of bars for each extrema
 ]display {(≢⍵), ¯1↑⍵}¨ {(1++\|⍵[;2])⊆⍵[;4]}  20↑xp
 ⍝ --- Number of bars, extrema price, previous extrema price
 ]display 10↑ {⍵,¯1⌽⍵[;2]} ↑{(≢⍵),¯1↑⍵}¨ {(1++\|⍵[;2])⊆⍵[;4]}  xp
 
-
+⍝ --- --- --- ---
 ⍝ --- ZigZag as per neurotrader
-]display 20↑ xtr← 0.1 ( (↑∘⌽∘⊃)⍤{qdc←⍺⋄⊃{(ax (dir xi xp))←⍵⋄(i p)←⍺⋄0<dir×p-xp:(ax (dir i p))⋄qdc<dir×xp-p:(((⊂i xi xp),ax) ((-dir) i p))⋄⍵} / ⍵}∘{⌽(⊂((⊂⍬), ⊂1,1, 2⌷⊃⍵)),1↓⍵}∘↓) ⊢ ((⍳∘≢),⊢) lk[;,4]
-
-
+]display 20↑ xtr← 0.1 ( (↑∘⌽∘⊃)⍤{qdc←⍺⋄⊃{(ax (dir xi xp))←⍵⋄(i p)←⍺⋄0<dir×p-xp:(ax (dir i p))⋄qdc<dir×xp-p:(((⊂dir, i xi xp),ax) ((-dir) i p))⋄⍵} / ⍵}∘{⌽(⊂((⊂⍬), ⊂1,1, 2⌷⊃⍵)),1↓⍵}∘↓) ⊢ ((⍳∘≢),⊢) lk[;,4]
 ⍝ --- Extrapolate extremas
-]display 10↑ xpol←   {⊃,/⍵[;1]+⍵[;3]×¯1+⍳¨⍵[;2]} {x←⍵[;3 2]⋄z←(1⊖x)-x⋄d←÷/z⋄¯1↓⍵[;,3],z[;,2],d}  xtr
+]display 10↑ xpol←  {⊃,/⍵[;1]+⍵[;3]×¯1+⍳¨⍵[;2]} {z←⌽(1⊖⍵)-⍵⋄d←÷/z⋄¯1↓⍵[;,2],z[;,2],d} ¯2↑[2] xtr
 ⍝ Plot extremas and price
 ]plot pspl ((⍳≢),⊢) 200↑ ((≢xpol)↑lk[;,4]),xpol
 
@@ -336,7 +337,27 @@ iogr ←  50 14 (¯1 0 1) ( {((↓4 2⍴1 1 ¯1 ¯1 1 ¯1 ¯1 1)⍪⍵[;1]) {⍺
 ⍝ 
 ⍝ 
 ⍝ 
-
+⍝ -------------------------------------------------------------
+⍝ -------------------------------------------------------------
+⍝  TODOs / 
+⍝ -------------------------------------------------------------
+⍝ -------------------------------------------------------------
+⍝ 
+⍝ --- Extract Dailies / 3D / W / 2W from 1h / 4h
+⍝ --- Fit fibonnaci levels based on highs and lows, potentially on higher timeframe
+⍝ --- Backtest rejections of fibonacci levels
+⍝ --- Bottom-outs, n candles to support + wick through
+⍝ --- Pullbacks in trends: higher/lower qdc extremas
+⍝ --- On 4h - rejection to around previous extrema
+⍝ --- Pullbacks to EMAS on strong momentum (diff btn emas)
+⍝ --- Implement KAMA filters
+⍝ --- Implement HMMs
+⍝ --- HMM statistics
+⍝ --- Price / EMA statistics (+ATR/STD)
+⍝ --- Matrix Profile
+⍝ --- Reverse return to model
+⍝ --- SL stats
+⍝ --- Ichimoku cloud
 
 
 
