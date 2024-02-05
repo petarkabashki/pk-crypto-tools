@@ -356,8 +356,10 @@ iogr ←  50 14 (¯1 0 1) ( {((↓4 2⍴1 1 ¯1 ¯1 1 ¯1 ¯1 1)⍪⍵[;1]) {⍺
 ⍝ --- Price / EMA statistics (+ATR/STD)
 ⍝ --- Matrix Profile
 ⍝ --- Reverse return to model
-⍝ --- SL stats
+⍝ --- SL stats for signals
 ⍝ --- Ichimoku cloud
+⍝ --- Time / Volume of price below level / btn levels
+⍝ --- Distribution of the above in bands ; HMM on those
 
 
 
