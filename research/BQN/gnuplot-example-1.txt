@@ -1,7 +1,7 @@
 set title 'Price and EMA' font ',18'
 set 	terminal wxt size 1300,600
 set 	style line 5 lt rgb 'cyan' lw 3 pt 6
-plot '-' lw 0.5 lc rgb 'black' with lines, '-' lw 0.5 lc rgb 'black' with lines
+plot '-' lw 0.5 lc rgb 'blue' with lines, '-' lw 0.5 lc rgb 'red' with lines
 0 0.5168
 1 0.46380000000000005
 2 0.3486
