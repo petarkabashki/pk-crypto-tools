@@ -46,39 +46,51 @@ WStd ← √∘WVar
 #-⟜» 
 ### Bins and Quantiles
 
-### 𝕩-step bin values, right-side ≤ of bins
-QBins ← {so←∧𝕩⋄
-	sta‿end←0‿¯1⊏so⋄
-  ls←sta+(1+↕𝕨)×(end-sta)÷𝕨⋄
-	cux←+˝so≤⌜ls⋄
-	(cux-1)⊏so
+GBars ← {
+	plt ← Gnuplot "
+		title '"∾𝕨∾"' font ',18'
+		terminal wxt size 1300,600
+		style line 5 lt rgb 'cyan' lw 3 pt 6"
+	plt.Plot 𝕩‿"using 1:2 with boxes fillstyle pattern 5 title ''"
+	"gnuplot-histogram-1.txt" •file.Chars plt.Debug @
+	•SH "gnuplot"‿"-persist"‿"gnuplot-histogram-1.txt"
 } 
-3 QBins ↕12
-
-### Divides values into 𝕨 bins and outputs the right-side (≤) edges
-VBins ← {so←∧𝕩⋄
+### Cumulative Bins aka Cumulative Probability Density
+CumBins ← {
+	so←∧𝕩⋄
 	sta‿end←0‿¯1⊏so⋄
-  ls←sta+(1+↕𝕨)×(end-sta)÷𝕨⋄
-	tv←-⟜» cux←+˝so≤⌜ls⋄ #number of values to take into every bin
-	tv /⊸⊔ so
-	#(cux-1)⊏so
-}
-### Histogram
-4 
-20 {
-nb←>(+´(÷⋈⊢)≠)¨ 𝕨 VBins 𝕩
-plt ← Gnuplot "
-  title 'Histogram' font ',18'
-	terminal wxt size 1300,600
-	style line 5 lt rgb 'cyan' lw 3 pt 6
-"
-plt.Plot nb‿"using 1:2 with boxes fillstyle pattern 5 title ''"
-"gnuplot-histogram-1.txt" •file.Chars plt.Debug @
-•SH "gnuplot"‿"-persist"‿"gnuplot-histogram-1.txt"
-} 2000+ ⋆⟜3 ¯5000+↕10000
+  ls←sta+((1e¯3÷𝕨)+1+↕𝕨)×(end-sta)÷𝕨⋄
+	cux←+˝so≤⌜ls⋄
+	cux ≍ ls
+} 
+⌽˘⍉50 CumBins 1000÷˜1+↕100
 
- #3 {b←𝕨 Bins 𝕩⋄-⟜»b} ↕12
-#3 VBins ↕12# ⋆⟜2 ÷⟜10 ¯50+ ↕101
+### Cumulative Distribution Diagram
+#"Cumulative Counts" GBars ⌽˘⍉50 CumBins 1000÷˜ ⋆⟜1.8 1+↕100
+ CumBinsPct ← (((⊢÷⟨¯1⟩⊸⊑)0⊸⊏)≍1⊸⊏)∘CumBins 
+⍉500 CumBinsPct 1+↕100
+#"Cumulative Percentage" GBars ⌽˘⍉50 CumBinsPct ⋆⟜2.5 1+↕100
+### Bins aka Distribution Histogram
+HBins ← {
+	so←∧𝕩⋄
+	sta‿end←0‿¯1⊏so⋄
+  ls←sta+((1e¯3÷𝕨)+1+↕𝕨)×(end-sta)÷𝕨⋄
+	cux←+˝so≤⌜ls⋄
+	tv←-⟜» cux⋄ #number of values to take into every bin
+	tv /⊸⊔ so⋄
+}
+
+20 HBins ⋆⟜2 ↕10
+### Histogram
+Hist ← "Histogram" GBars (>(+´(÷⋈⊢)≠)¨)∘HBins 
+100 Hist  ⋆⟜2 ↕10
+
+### Histogram in %
+30 (⍉∘>∘((0⊸⊏)≍((⊢÷+´)1⊸⊏))∘⍉∘>(+´(÷⋈⊢)≠)¨)∘HBins 2000+ ⋆⟜3 ¯5000+↕10000
+
+PHist ← "Histogram" GBars (⍉∘>∘((0⊸⊏)≍((⊢÷+´)1⊸⊏))∘⍉∘>(+´(÷⋈⊢)≠)¨)∘HBins 
+30 PHist 2000+ ⋆⟜3 ¯5000+↕10000
+
 
 csv ← "',/" •Import "./bqn-libs/csv.bqn"  # Easier characters to write
 
