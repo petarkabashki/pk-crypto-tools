@@ -63,12 +63,12 @@ CumBins ← {
 	cux←+˝so≤⌜ls⋄
 	cux ≍ ls
 } 
-⌽˘⍉50 CumBins 1000÷˜1+↕100
+#⌽˘⍉50 CumBins 1000÷˜1+↕100
 
 ### Cumulative Distribution Diagram
 #"Cumulative Counts" GBars ⌽˘⍉50 CumBins 1000÷˜ ⋆⟜1.8 1+↕100
  CumBinsPct ← (((⊢÷⟨¯1⟩⊸⊑)0⊸⊏)≍1⊸⊏)∘CumBins 
-⍉500 CumBinsPct 1+↕100
+#⍉500 CumBinsPct 1+↕100
 #"Cumulative Percentage" GBars ⌽˘⍉50 CumBinsPct ⋆⟜2.5 1+↕100
 ### Bins aka Distribution Histogram
 HBins ← {
@@ -80,45 +80,102 @@ HBins ← {
 	tv /⊸⊔ so⋄
 }
 
-20 HBins ⋆⟜2 ↕10
+#20 HBins ⋆⟜2 ↕10
 ### Histogram
 Hist ← "Histogram" GBars (>(+´(÷⋈⊢)≠)¨)∘HBins 
-100 Hist  ⋆⟜2 ↕10
+#100 Hist  ⋆⟜2 ↕10
 
 ### Histogram in %
-30 (⍉∘>∘((0⊸⊏)≍((⊢÷+´)1⊸⊏))∘⍉∘>(+´(÷⋈⊢)≠)¨)∘HBins 2000+ ⋆⟜3 ¯5000+↕10000
+#30 (⍉∘>∘((0⊸⊏)≍((⊢÷+´)1⊸⊏))∘⍉∘>(+´(÷⋈⊢)≠)¨)∘HBins 2000+ ⋆⟜3 ¯5000+↕10000
 
 PHist ← "Histogram" GBars (⍉∘>∘((0⊸⊏)≍((⊢÷+´)1⊸⊏))∘⍉∘>(+´(÷⋈⊢)≠)¨)∘HBins 
-30 PHist 2000+ ⋆⟜3 ¯5000+↕10000
+#30 PHist 2000+ ⋆⟜3 ¯5000+↕10000
 
 
 csv ← "',/" •Import "./bqn-libs/csv.bqn"  # Easier characters to write
+cldir ← "/media/grenada/Data/Crypto-Historical-Data/data-csv/binance/"
 
-lines ← •FLines "ALGO_USDT-1d.csv"
-≢lines
-c ← csv.SplitL lines
-ch←1↑c
-cv←1↓c
-#cv← •ParseFloat¨¨  1↓c
-cv •ParseFloat¨¨↩
+LoadCandles ← { 
+	base‿quote←𝕨⋄
+	timeframe←𝕩⋄
+	>•ParseFloat¨¨ 1↓ csv.SplitL •FLines cldir ∾base∾"_"∾quote∾"-"∾timeframe∾".csv"⋄
+}
+#10↑⟨"BTC","USDT"⟩ LoadCandles "1d"
 
-↑10↑cv
-dcv←>cv
-4↑dcv
-((↕≠)∾˘⊢)dcv
-≢⍉dcv
 
-⟨ts,op,hi,lo,cl,vo⟩←<˘⍉dcv
-cl
-≢dcv
-≠dcv
-≢0‿¯1↓0‿1↓dcv
-∾˝0‿¯1↓0‿4↓dcv
-#⟨<¯2⟩⊏¨dcv
-⊑¯1↑¯1↓<˘⍉dcv
 #################################################################
-###  Technical Indicators 
+### Ichimoku Cloud 
 #################################################################
+Ichimoku ← {
+	con‿ban‿bn←𝕨⋄
+	col ← ÷⟜2 +´⌈‿⌊ {(0⥊˜con-1)∾𝕎 ˝˘ con↕𝕩}¨ ⋈˝⍉2‿3⊸⊏˘𝕩⋄
+	bal ← ÷⟜2 +´⌈‿⌊ {(0⥊˜ban-1)∾𝕎 ˝˘ ban↕𝕩}¨ ⋈˝⍉2‿3⊸⊏˘𝕩⋄
+	lesA ← (ban⥊0)» ÷⟜2 col + bal⋄
+	lesB ← (ban⥊0)» ÷⟜2 +´⌈‿⌊ {(0⥊˜bn-1)∾𝕎 ˝˘ bn↕𝕩}¨ ⋈˝⍉2‿3⊸⊏˘𝕩⋄
+	col‿bal‿lesA‿lesB
+}
+
+PlotIchimoku ← {
+	base‿quote←𝕨⋄
+	timeframe←𝕩⋄
+	
+	dcv ←500↑base‿quote LoadCandles timeframe⋄
+	cl←¯2⊏˘dcv⋄
+	col‿bal‿lesA‿lesB ← 30‿60‿120 Ichimoku dcv⋄
+	ixs ← ↕≠dcv⋄
+	plt ← Gnuplot "
+		title 'Ichimoku Cloud' font ',18'
+		terminal wxt size 1800,900
+		style line 5 lt rgb 'cyan' lw 3 pt 6"
+	plt.Plot (⍉>ixs‿lesA‿lesB)‿" with filledcurves fs solid 0.1"
+	plt.Plot (⍉>ixs‿cl)‿"lw 1 lc rgb 'black' with lines"
+	plt.Plot (⍉>ixs‿col)‿"lw 1 lc rgb '#5555CC' with lines"
+	plt.Plot (⍉>ixs‿bal)‿"lw 1 lc rgb 'red' with lines"
+	plt.Plot (⍉>ixs‿lesA)‿"lw 1 lc rgb 'gray' with lines"
+	plt.Plot (⍉>ixs‿lesB)‿"lw 1 lc rgb 'gray' with lines"
+	"gnuplot-ichimoku-1.txt" •file.Chars plt.Debug @
+	•SH "gnuplot"‿"-persist"‿"gnuplot-ichimoku-1.txt"
+}
+#"BTC"‿"USDT" PlotIchimoku "1d"
+###
+
+#################################################################
+### Directional Change / ZigZag Algorithm 
+#################################################################
+#≍↕3
+IfElse ← {cond‿True‿False: cond◶False‿True @}
+TestConds ← {fn←{Cond‿Act 𝕊 else: Cond◶Else‿Act}´𝕩 ⋄ Fn@}
+cl← ⋆⁼ ¯2⊸⊏˘ "BTC"‿"USDT" LoadCandles "1d"
+pks←0.15 {
+	qdc←𝕨⋄
+	1↓⌽¯1⊑(0‿1‿0‿(⊑𝕩)‿(≍0‿0)) {
+		ix‿dir‿xi‿xp‿evx←𝕩
+		p←𝕨
+#		•Show "Current values: "
+#		•Show ix‿dir‿xi‿xp‿p
+		nacc← TestConds ⟨
+			(0<dir×p-xp)‿		{𝕤⋄dir‿ix‿p‿evx}		# Continues in the same direction as before, update xi & xp
+			{qdc≥dir×-p-xp}‿	{𝕤⋄dir‿xi‿xp‿evx}		# Opposite direction, below threshold, keep previous xi & xp
+											{𝕤⋄(-dir)‿ix‿p‿((xi‿dir)∾evx)} # Opposite direction, above threshold, change direction
+		⟩
+#		•Show ix∾(¯1↓nacc)
+		(ix+1)∾nacc
+	}´ ⌽𝕩⋄
+} cl 
+pix←0⊑˘pks
+≠cl
+≢pix
+pcpix←pix⊸⊏cl
+ixs←↕≠cl
+plt ← Gnuplot "
+	title 'ZigZag Algorithm' font ',18'
+	terminal wxt size 1800,900
+	style line 1 lt rgb 'black' lw 1"
+plt.Plot (⍉>pix‿pcpix)‿" lw 2 lc rgb 'red' pt 7 ps 3"
+plt.Plot (⍉>ixs‿cl)‿"lw 1 lc rgb 'black' with lines"
+"gnuplot-zigzag-1.txt" •file.Chars plt.Debug @
+•SH "gnuplot"‿"-persist"‿"gnuplot-zigzag-1.txt"
+18541.28 ÷ 18325.11 -1 
 
 stds ← 14 WStd cl
 ixs←(↕≠cl)
