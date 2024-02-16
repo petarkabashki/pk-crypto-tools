@@ -142,30 +142,26 @@ PlotIchimoku ← {
 #################################################################
 ### Directional Change / ZigZag Algorithm 
 #################################################################
-#≍↕3
 IfElse ← {cond‿True‿False: cond◶False‿True @}
 TestConds ← {fn←{Cond‿Act 𝕊 else: Cond◶Else‿Act}´𝕩 ⋄ Fn@}
 cl← ⋆⁼ ¯2⊸⊏˘ "BTC"‿"USDT" LoadCandles "1d"
-pks←0.15 {
+Peaks ← {
 	qdc←𝕨⋄
 	1↓⌽¯1⊑(0‿1‿0‿(⊑𝕩)‿(≍0‿0)) {
 		ix‿dir‿xi‿xp‿evx←𝕩
 		p←𝕨
-#		•Show "Current values: "
-#		•Show ix‿dir‿xi‿xp‿p
 		nacc← TestConds ⟨
 			(0<dir×p-xp)‿		{𝕤⋄dir‿ix‿p‿evx}		# Continues in the same direction as before, update xi & xp
 			{qdc≥dir×-p-xp}‿	{𝕤⋄dir‿xi‿xp‿evx}		# Opposite direction, below threshold, keep previous xi & xp
 											{𝕤⋄(-dir)‿ix‿p‿((xi‿dir)∾evx)} # Opposite direction, above threshold, change direction
 		⟩
-#		•Show ix∾(¯1↓nacc)
 		(ix+1)∾nacc
 	}´ ⌽𝕩⋄
-} cl 
+}
+pks ← 0.20 Peaks cl 
 pix←0⊑˘pks
-≠cl
-≢pix
 pcpix←pix⊸⊏cl
+0.15>|-˝pcpix≍»pcpix
 ixs←↕≠cl
 plt ← Gnuplot "
 	title 'ZigZag Algorithm' font ',18'
@@ -176,6 +172,11 @@ plt.Plot (⍉>ixs‿cl)‿"lw 1 lc rgb 'black' with lines"
 "gnuplot-zigzag-1.txt" •file.Chars plt.Debug @
 •SH "gnuplot"‿"-persist"‿"gnuplot-zigzag-1.txt"
 18541.28 ÷ 18325.11 -1 
+
+
+
+
+
 
 stds ← 14 WStd cl
 ixs←(↕≠cl)
