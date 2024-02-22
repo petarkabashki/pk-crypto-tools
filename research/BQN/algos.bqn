@@ -3,7 +3,7 @@
 
 ⟨JParse⇐Parse,JExport⇐Export⟩←•Import "bqn-libs/json.bqn"
 ⟨Split , Join,  SplitL, JoinL⟩←•Import "bqn-libs/csv.bqn"
-⟨WMean, Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist⟩←•Import "pk-libs.bqn"
+⟨GLine, WMean, Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist⟩←•Import "pk-libs.bqn"
 
 csv ← "',/" •Import "./bqn-libs/csv.bqn"  # Easier characters to write
 csvdir ← "/media/grenada/Data/Crypto-Historical-Data/data-csv/binance/"
@@ -20,11 +20,6 @@ LdJson ←{
 	>JParse •FChars jsondir∾(⊑𝕩)∾"_"∾(1⊑𝕩)∾"-"∾(𝕨)∾".json"
 }
 LdJsLc ← {⋆⁼ ¯2⊏˘ 𝕨 LdJson 𝕩‿"USDT"}
-#"1d" LdJsLc "BTC"
-
-#3↑klines← "1d" LdJson "XRP"‿"USDT"
-#3↑ lohlc← ⋆⁼ 1↓˘ ¯1↓˘ klines 
-#lc←¯1⊏˘lohlc
 errmea←0.1
 ### GH-Filter aka Kalman Filter
 FGH←{
@@ -36,43 +31,74 @@ FGH←{
 		x_pred‿(x_pred + g×resid÷dt)‿(dx+h×resid÷dt)
 	}`𝕩 
 } 
-XIndicators←{
-	lc⇐𝕩
-	ghpars⇐𝕨
-	xest⇐(𝕨 FGH lc).xest
-	abv⇐lc>xest
-	crup⇐∧⟜(¬»)abv
-	crdn⇐∧⟜(¬1⊸»)¬abv
-	#ixpos⇐crup (>∘{m←⌊´≠¨𝕩⋄m↑¨𝕩}∘⋈○/) crdn
-} 
-#⟨crup⟩ ← 1‿0.001‿0.001 XIndicators lc
-#crup
-#(»-⊢)↕10
-(4⥊0) »↕10
-XEntries ← {
-	xind⇐𝕩
-	#flt←0⊸<(⊢-») / xind.crup
-	#flt ← 0.00 > ((2⥊0)⊸»-⊢)xind.xest
-	xenter⇐xind.crup
-} 
-XEntries 1‿0.001‿0.001 XIndicators "1d" LdJsLc "BTC"
+#######################################
+### Strategy
+###
+xStra ← {
+	XLoad ⇐ {⋆⁼ ¯2⊏˘ (⊑𝕩) LdJson 1↓𝕩}
+	XIndicators⇐{
+		lc⇐𝕩
+		ghpars⇐𝕨
+		xest⇐(𝕨 FGH lc).xest
+		abv⇐lc>xest
+		crup⇐∧⟜(¬»)abv
+		crdn⇐∧⟜(¬1⊸»)¬abv
+	} 
+	XEntries ⇐ {
+		xind⇐𝕩
+		#flt←0⊸<(⊢-») / xind.crup
+		#flt ← 0.00 > ((2⥊0)⊸»-⊢)xind.xest
+		xenter⇐xind.crup
+	} 
+	#XEntries 1‿0.001‿0.001 XIndicators "1d" LdJsLc "BTC"
+	XExits ⇐ {
+		xind‿xenter⇐𝕩	
+		xexit⇐xind.crdn
+	} 
+	#xind‿xenter‿xexit ← XExits XEntries 1‿0.001‿0.001 XIndicators lc
+	XPositions ⇐ {
+		xind‿xenter‿xexit⇐𝕩	
+		posinx⇐ /xenter
+		poslens⇐1↓(((+´∘¬∨`)))¨ (+`xenter) ⊔ xexit
+		posoutx⇐ ((≠xind.lc)-1)⌊posinx+poslens
+		cio ⇐ (posinx≍posoutx) ⊏ xind.lc 
+		pnl⇐--˝cio
+		cumpnl⇐+`pnl
+		#wins⇐
+		#winrate⇐ (()÷≠) pnl
+	} 
+	XStats ⇐ {
+		pnl‿cumpnl⇐𝕩
+		stats⇐{
+			ret⇐¯1⊑0∾cumpnl
+			ntrades⇐≠pnl⋄nwins⇐+´pnl>0⋄nlosses⇐ntrades-nwins⋄winratio⇐nwins÷ntrades⋄
+			wins⇐(0⊸<⊸/)pnl⋄losses⇐(0⊸≥⊸/)pnl⋄avgwin⇐(+´÷≠)wins⋄avgloss⇐(+´÷≠)losses⋄
+			maxpnl⇐⌈`cumpnl
+			ddn⇐-maxpnl-cumpnl
+			maxddn⇐⌊´ddn
+			vol⇐√Var pnl
+			sharpe⇐ret÷vol
+			toppnl⇐⌈´maxpnl
+		}
+		#stats⇐>⟨"#Trades:"‿ntrades, "#Wins:"‿nwins⟩
+		#•Show cumpnl
+	}
+	XRun ⇐ {XStats XPositions XExits XEntries 𝕨 XIndicators Xload 𝕩}
+}
+FmtNs ← {k←•ns.Keys 𝕩⋄⍉k≍𝕩 •ns.Get¨k}
 
-XExits ← {
-	xind‿xenter⇐𝕩	
-	xexit⇐xind.crdn
-} 
-#xind‿xenter‿xexit ← XExits XEntries 1‿0.001‿0.001 XIndicators lc
-XPositions ← {
-	xind‿xenter‿xexit⇐𝕩	
-	posinx⇐ /xenter
-	poslens⇐1↓(((+´∘¬∨`)))¨ (+`xenter) ⊔ xexit
-	posoutx⇐ ((≠xind.lc)-1)⌊posinx+poslens
-	cio ⇐ (posinx≍posoutx) ⊏ xind.lc 
-	pnl⇐--˝cio
-	cumpnl⇐+`pnl
-} 
-#stra← XPositions XExits XEntries 1‿0.001‿0.001 XIndicators lc
+{st←𝕩.stats⋄•Show FmtNs st⋄
+	plt ← Gnuplot "
+		title 'Line plot' font ',18'
+		terminal wxt size 1300,600
+		style line 5 lt rgb 'cyan' lw 5 pt 6"
+	plt.Plot (((↕≠)∾˘⊢)𝕩.cumpnl)‿"lw 1 lc rgb 'blue' with lines"
+	"gnuplot-tmp-1.txt"•file.Chars plt.Debug @
+	•SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
+} ⟨0.45,0.06138,0.00598⟩ xStra.XRun "8h"‿"ALGO"‿"USDT"
+#xStra.XStats xStra.XPositions xStra.XExits xStra.XEntries⟨0.45,0.06138,0.00598⟩ xStra.XIndicators xStra.Xload "8h"‿"ALGO"‿"USDT"
 GStra ←{
+	#stra← XPositions XExits XEntries 1‿0.001‿0.001 XIndicators lc
 	stra ← 𝕩
 	ymin‿ymax← ⌊‿⌈ {𝕎 ´ 𝕩}¨<stra.xind.lc
 	ts←↕≠stra.xind.lc
@@ -104,7 +130,7 @@ GStra ←{
 GenRan ←	<˘∘⍉∘>((⊣ •rand.Range (2⊸⊑⊢))×((2⊸⊑÷˜⟜(1⊸⊑-⊑))⊢))¨ 
 3 GenRan ⟨0,10,100⟩‿⟨0,1,100⟩
 ### Objective function
-Obj← {stra←XPositions XExits XEntries 𝕩 XIndicators (⋆⁼ ¯2⊏˘ "4h"⊸LdJson "SOL"‿"USDT") ⋄ ¯1⊑(0∾stra.cumpnl)}
+Obj← {stra←XPositions XExits XEntries 𝕩 XIndicators (⋆⁼ ¯2⊏˘ "8h"⊸LdJson "EGLD"‿"USDT") ⋄ ¯1⊑(0∾stra.cumpnl)}
 #((Obj¨ <˘))
 ### Calculate Obj on list of params
 #>(⋈⟜Obj)¨ 5 GenRan ⟨0,10,100⟩‿⟨0,1,100⟩‿⟨0,1,100⟩
@@ -121,8 +147,8 @@ Genetic ← {
 		
 	}´ ↕niter
  }
- #"strat-params.json" •FChars JExport <˘2‿3⥊↕100
- "strat-params.csv" •FLines •Fmt¨ <˘15‿20‿20‿10 Genetic ⟨0,3,20⟩‿⟨0,0.1,1000⟩‿⟨0,0.1,1000⟩
+{"strat-params.csv" •FLines •Fmt¨ <˘𝕩⋄𝕩} 10‿20‿10‿10 Genetic ⟨1,4,20⟩‿⟨0.001,0.1,100⟩‿⟨0.001,0.3,100⟩
+ 
 3.05‿0.05‿0.22
 0.7‿0.01‿0.222
 2.25‿0.01‿0.222

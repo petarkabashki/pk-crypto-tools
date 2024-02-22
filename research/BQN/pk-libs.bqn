@@ -1,6 +1,6 @@
 # Comma-separated values (.csv)
 ⟨
-  WMean , Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist
+  GLine, WMean , Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist
 ⟩⇐
 
 
@@ -97,12 +97,11 @@ PHist ← "Histogram" GBars (⍉∘>∘((0⊸⊏)≍((⊢÷+´)1⊸⊏))∘⍉�
 #30 PHist 2000+ ⋆⟜3 ¯5000+↕10000
 
 GLine← {
-	ws‿ww←𝕨
 	plt ← Gnuplot "
 		title 'Line plot' font ',18'
 		terminal wxt size 1300,600
 		style line 5 lt rgb 'cyan' lw 5 pt 6"
-	plt.Plot (ww↑ws↓((↕≠)∾˘⊢)𝕩)‿"lw 1 lc rgb 'blue' with lines"
+	plt.Plot (((↕≠)∾˘⊢)𝕩)‿"lw 1 lc rgb 'blue' with lines"
 	"gnuplot-tmp-1.txt"•file.Chars plt.Debug @
 	•SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
 }
