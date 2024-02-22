@@ -1,7 +1,8 @@
 
 ⟨Gnuplot⟩ ← •Import "Gnuplot.bqn"
 
-⟨JParse⇐Parse⟩←•Import "bqn-libs/json.bqn"
+⟨JParse⇐Parse,JExport⇐Export⟩←•Import "bqn-libs/json.bqn"
+⟨Split , Join,  SplitL, JoinL⟩←•Import "bqn-libs/csv.bqn"
 ⟨WMean, Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist⟩←•Import "pk-libs.bqn"
 
 csv ← "',/" •Import "./bqn-libs/csv.bqn"  # Easier characters to write
@@ -18,77 +19,175 @@ jsondir←"/media/grenada/Data/Crypto-Data-Feed/freq-user-data/data/binance/"
 LdJson ←{ 
 	>JParse •FChars jsondir∾(⊑𝕩)∾"_"∾(1⊑𝕩)∾"-"∾(𝕨)∾".json"
 }
+LdJsLc ← {⋆⁼ ¯2⊏˘ 𝕨 LdJson 𝕩‿"USDT"}
+#"1d" LdJsLc "BTC"
 
-#################################################################
-### Calman Filter 
-###############################################################
-3↑tkls← "8h" LdJson "AVAX"‿"USDT"
-3↑ lcl← ⋆⁼ 1↓˘ ¯1↓˘ tkls
-cl←¯1⊏˘lcl
+#3↑klines← "1d" LdJson "XRP"‿"USDT"
+#3↑ lohlc← ⋆⁼ 1↓˘ ¯1↓˘ klines 
+#lc←¯1⊏˘lohlc
 errmea←0.1
 ### GH-Filter aka Kalman Filter
-GHF←{
+FGH←{
 	dt‿g‿h←𝕨
-	(<(2⥊⊑cl)∾0){
-		z←𝕩
+	xpred‿xest‿dx ⇐ <˘⍉> (<(2⥊⊑𝕩)∾0){
 		p_pred‿x_est‿dx←𝕨
-		# prediction step
 		x_pred←x_est + dx×dt
-		# update step
-		resid←z-x_pred
+		resid←𝕩-x_pred
 		x_pred‿(x_pred + g×resid÷dt)‿(dx+h×resid÷dt)
-	} ` 𝕩 
+	}`𝕩 
 } 
-XPos ← {
-	cl‿klm←𝕩⋄abv←cl>klm⋄crup←∧⟜(¬»)abv⋄crdn←∧⟜(¬1⊸»)¬abv⋄
-	ixpos←crup (>∘{m←⌊´≠¨𝕩⋄m↑¨𝕩}∘⋈○/) crdn
-	clpos←ixpos ⊏ cl
-	dr← 0>  -˝(⊢⊏⟜klm) (⊢≍-⟜2) (⊏ixpos)	
-	pnl ← dr× --˝ clpos
-	cumpnl ← +`pnl
-	pnl≍cumpnl
-	ixpos‿clpos‿(pnl≍cumpnl)
-}
-#wixpos←sks↓˘ske↓˘ixpos ⋄ wclpos←sks↓˘ske↓˘clpos⋄ wpnls←sks↓˘ske↓˘pnls
-GLine← {
-	ws‿ww←𝕨
+XIndicators←{
+	lc⇐𝕩
+	ghpars⇐𝕨
+	xest⇐(𝕨 FGH lc).xest
+	abv⇐lc>xest
+	crup⇐∧⟜(¬»)abv
+	crdn⇐∧⟜(¬1⊸»)¬abv
+	#ixpos⇐crup (>∘{m←⌊´≠¨𝕩⋄m↑¨𝕩}∘⋈○/) crdn
+} 
+#⟨crup⟩ ← 1‿0.001‿0.001 XIndicators lc
+#crup
+#(»-⊢)↕10
+(4⥊0) »↕10
+XEntries ← {
+	xind⇐𝕩
+	#flt←0⊸<(⊢-») / xind.crup
+	#flt ← 0.00 > ((2⥊0)⊸»-⊢)xind.xest
+	xenter⇐xind.crup
+} 
+XEntries 1‿0.001‿0.001 XIndicators "1d" LdJsLc "BTC"
+
+XExits ← {
+	xind‿xenter⇐𝕩	
+	xexit⇐xind.crdn
+} 
+#xind‿xenter‿xexit ← XExits XEntries 1‿0.001‿0.001 XIndicators lc
+XPositions ← {
+	xind‿xenter‿xexit⇐𝕩	
+	posinx⇐ /xenter
+	poslens⇐1↓(((+´∘¬∨`)))¨ (+`xenter) ⊔ xexit
+	posoutx⇐ ((≠xind.lc)-1)⌊posinx+poslens
+	cio ⇐ (posinx≍posoutx) ⊏ xind.lc 
+	pnl⇐--˝cio
+	cumpnl⇐+`pnl
+} 
+#stra← XPositions XExits XEntries 1‿0.001‿0.001 XIndicators lc
+GStra ←{
+	stra ← 𝕩
+	ymin‿ymax← ⌊‿⌈ {𝕎 ´ 𝕩}¨<stra.xind.lc
+	ts←↕≠stra.xind.lc
+	ws‿ww←0‿(≠stra.xind.lc)
+	•Show stra.xind.ghpars
 	plt ← Gnuplot "
-		title 'Line plot' font ',18'
-		terminal wxt size 1300,600
-		style line 5 lt rgb 'cyan' lw 5 pt 6"
-	plt.Plot (ww↑ws↓((↕≠)∾˘⊢)𝕩)‿"lw 1 lc rgb 'blue' with lines"
-	"gnuplot-tmp-1.txt"•file.Chars plt.Debug @
-	•SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
-}
-Btest ← {
-	ghpars‿wsw←𝕨⋄ws‿ww←wsw⋄cl←𝕩⋄
-	klm←> (1⊸⊏˘>)¨  (<ghpars) (GHF)¨ <cl
-	ixpos‿clpos‿pnls ← XPos cl‿klm
-	ts←↕≠tkls
-	sks‿ske← ws‿ww{ws‿ww←𝕨⋄((-+´(ws+ww)<1⊸⊏𝕩))‿(+´ws>⊏𝕩)} ixpos
-	wixpos‿wclpos‿wpnls←(ske⊸↓˘ sks⊸↓˘)¨ixpos‿clpos‿pnls
-	plt ← Gnuplot "
-		title 'G-H Filter' font ',18'
-		terminal wxt size 1300,600
+		title 'G-H Filter:"∾(•Fmt stra.xind.ghpars)∾"' font ',18'
+		terminal wxt size 2200,1300
 		y2tics nomirror tc lt 2
 		style line 5 lt rgb 'cyan' lw 5 pt 6
 		style fill empty"
-	xs←plt.Debug @
-	plt.Plot (ww↑ws↓ts∾˘cl)‿"lw 1 lc rgb 'blue' with lines"
-	plt.Plot (ww↑ws↓ts∾˘klm)‿"lw 1.5 with lines"
-	plt.Plot (⍉>¯1⊸⊏¨wixpos‿wpnls)‿"lc rgb 'red' lw 1.5 with lines axes x1y2"
+	#xs←plt.Debug @
+#	plt.Plot (⍉stra.posinx≍⊏stra.cio)‿" with lines"
+	plt.Plot (ww↑ws↓ts∾˘stra.xind.lc)‿"lw 1 lc rgb 'blue' with lines"
+	plt.Plot (ww↑ws↓ts∾˘stra.xind.xest)‿"lw 1.5 with lines"
+	plt.Plot (0‿0∾⍉stra.posoutx≍stra.cumpnl)‿"lc rgb 'red' lw 1.5 with lines axes x1y2"
 	"gnuplot-tmp-1.txt"•file.Chars plt.Debug @
 	•SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
-	klm‿ixpos‿clpos‿pnls‿wixpos‿wclpos‿wpnls
+	𝕩
 } 
 
-klm‿ixpos‿clpos‿pnls‿wixpos‿wclpos‿wpnls←(0.001‿0.00001‿0.000007)‿(0‿(≠cl))  Btest cl
-¯10↑¨wpnls
-ys2tics 20 nomirror tc lt 2
+#GStra XPositions XExits XEntries 1‿0.04‿0.02 XIndicators (⋆⁼ ¯2⊏˘ "8h"⊸LdJson "BTC"‿"USDT") 
+
+##########################################################
+### Genetic Algorithm for Parameter Tuning
+###########
+
+### Generates random parameters 
+GenRan ←	<˘∘⍉∘>((⊣ •rand.Range (2⊸⊑⊢))×((2⊸⊑÷˜⟜(1⊸⊑-⊑))⊢))¨ 
+3 GenRan ⟨0,10,100⟩‿⟨0,1,100⟩
+### Objective function
+Obj← {stra←XPositions XExits XEntries 𝕩 XIndicators (⋆⁼ ¯2⊏˘ "4h"⊸LdJson "SOL"‿"USDT") ⋄ ¯1⊑(0∾stra.cumpnl)}
+#((Obj¨ <˘))
+### Calculate Obj on list of params
+#>(⋈⟜Obj)¨ 5 GenRan ⟨0,10,100⟩‿⟨0,1,100⟩‿⟨0,1,100⟩
+### Mutation
+Mutate ← {
+	r←1+•rand.Range ¯1+≠⊑𝕩
+	(r↑¨𝕩) ∾¨ r↓¨(•rand.Deal ≠𝕩) ⊏ 𝕩
+}
+Genetic ← {
+	pardefs ← 𝕩
+	niter‿ntop‿nper‿nmut ← 𝕨
+	(>(⋈⟜Obj)¨ nper GenRan pardefs) {
+		ntop ↑ ((⍒¯1⊸⊏˘)⊸⊏) 𝕩∾ >(⋈⟜Obj)¨  (⊏˘𝕩) (¬∘∊˜/⊢) (nper GenRan pardefs)∾(Mutate ⊏˘𝕩)
+		
+	}´ ↕niter
+ }
+ #"strat-params.json" •FChars JExport <˘2‿3⥊↕100
+ "strat-params.csv" •FLines •Fmt¨ <˘15‿20‿20‿10 Genetic ⟨0,3,20⟩‿⟨0,0.1,1000⟩‿⟨0,0.1,1000⟩
+3.05‿0.05‿0.22
+0.7‿0.01‿0.222
+2.25‿0.01‿0.222
+
+#stra←GStra XPositions XExits XEntries 1‿0.03‿0.001 XIndicators (⋆⁼ ¯2⊏˘ "4h"⊸LdJson "BTC"‿"USDT")
+#
+#stra←XPositions XExits XEntries 1‿0.02‿0.001 XIndicators 500↑ lc
+#0‿0∾⍉stra.posoutx≍stra.cumpnl
+#stra.posinx
+
+#############################################
+### Parameter sweeping
+
+### Nudge a value by percentage in n steps
+Nudge ← {p‿n←𝕨⋄𝕩×1+(p÷n)×((↕1⊸+)+∘-⌊∘÷⟜2)n}
+
+dxv←2‿1000 Nudge 3
+gv←3‿1000 Nudge 0.6
+hv←0.3‿1000 Nudge 0.2
+lc←(⋆⁼ ¯2⊏˘ "4h"⊸LdJson "BTC"‿"USDT")
+
+pp←dxv≍({𝕩‿0.6‿0.2}¨ dxv) { ¯1⊑0∾(XPositions XExits XEntries 𝕨 XIndicators 𝕩).cumpnl}¨ <lc
+#pp←gv≍({3.05‿𝕩‿0.227}¨ gv) { ¯1⊑0∾(XPositions XExits XEntries 𝕨 XIndicators 𝕩).cumpnl}¨ <lc
+#pp←hv≍({3.05‿0.6‿𝕩}¨ hv) { ¯1⊑0∾(XPositions XExits XEntries 𝕨 XIndicators 𝕩).cumpnl}¨ <lc
+plt ← Gnuplot "
+	title 'Line plot' font ',18'
+	terminal wxt size 1300,600
+	style line 5 lt rgb 'cyan' lw 5 pt 6"
+plt.Plot (⍉pp)‿"lw 1 lc rgb 'blue' with lines"
+"gnuplot-tmp-1.txt"•file.Chars plt.Debug @
+•SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
 
 
 
+#############################################
+### Cross-asset pnls
 
+# 1d
+#top100←⟨"AAVE","ADA","ALGO","AMP","APT","ARB","ASTR","ATOM","AVAX","AXS","BCH","BLUR","BNB","BONK","BTC","CAKE","CFX","CHZ","CRV","DOGE","DOT","DYM","EGLD","ENJ","ENS","EOS","ETC","ETH","FIL","FLOW","FTM","GALA","GNO","GRT","HBAR","ICP","ILV","IMX","INJ","IOTA","JUP","KAVA","KLAY","KSM","LDO","LINK","LRC","LTC","LUNA","LUNC","MANA","MANTA","MATIC","MINA","MKR","NEAR","NEO","OP","ORDI","OSMO","PENDLE","PYR","PYTH","QNT","RAY","REN","RNDR","ROSE","RUNE","SAND","SEI","SHIB","SNX","SOL","STX","SUI","THETA","TIA","TRX","UNI","USDC","VET","WOO","XLM","XMR","XRP","XTZ","ZIL"⟩
+top100←⟨"AAVE","ADA","ALGO","APT","ARB","ASTR","ATOM","AVAX","AXS","BCH","BLUR","BNB","BONK","BTC","CAKE","CHZ","DOGE","DOT","DYM","EGLD","ENJ","ETC","ETH","FIL","FTM","GALA","GNO","GRT","HBAR","ILV","IMX","INJ","IOTA","JUP","KLAY","KSM","LDO","LINK","LRC","LTC","LUNA","MANA","MANTA","MATIC","MINA","MKR","NEAR","NEO","OP","ORDI","OSMO","PENDLE","PYTH","RNDR","ROSE","RUNE","SAND","SEI","SHIB","SOL","STX","SUI","THETA","TIA","TRX","UNI","USDC","VET","WOO","XLM","XRP","ZIL"⟩
+
+#######################################################
+### Parameter Sweep over the whole portfolio of top 100
+###
+#pp←(⊢≍{+´1⊏˘((⍋1⊸⊏˘)⊏⊢) ⍉top100≍pnls←(<3‿𝕩‿0.001) { ¯1⊑0∾(XPositions XExits XEntries 𝕨 XIndicators 𝕩).cumpnl}¨ (⋆⁼ ¯2⊏˘ "1d"⊸LdJson)¨ (top100) ⋈¨ <"USDT"}¨) 1.5‿50 Nudge 0.12
+#pp←(⊢≍{+´1⊏˘((⍋1⊸⊏˘)⊏⊢) ⍉top100≍pnls←(<𝕩‿0.12‿0.001) { ¯1⊑0∾(XPositions XExits XEntries 𝕨 XIndicators 𝕩).cumpnl}¨ (⋆⁼ ¯2⊏˘ "1d"⊸LdJson)¨ (top100) ⋈¨ <"USDT"}¨) 2‿50 Nudge 3
+#pp←(⊢≍{+´1⊏˘((⍋1⊸⊏˘)⊏⊢) ⍉top100≍pnls←(<3‿0.12‿𝕩) { ¯1⊑0∾(XPositions XExits XEntries 𝕨 XIndicators 𝕩).cumpnl}¨ (⋆⁼ ¯2⊏˘ "1d"⊸LdJson)¨ (top100) ⋈¨ <"USDT"}¨) 2‿100 Nudge  0.001
+
+#plt ← Gnuplot "
+#	title 'Line plot' font ',18'
+#	terminal wxt size 1300,600
+#	style line 5 lt rgb 'cyan' lw 5 pt 6"
+#plt.Plot (⍉pp)‿"lw 1 lc rgb 'blue' with lines"
+#"gnuplot-tmp-1.txt"•file.Chars plt.Debug @
+#•SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
+
+#######################################################
+
+
+
+apnls←((⍋1⊸⊏˘)⊏⊢) ⍉top100≍pnls
++´1⊏˘apnls
+3↑klines← "1d" LdJson "XRP"‿"USDT"
+3↑ lohlc← ⋆⁼ 1↓˘ ¯1↓˘ klines 
+lc←¯1⊏˘lohlc
 
 
 
