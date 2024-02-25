@@ -3,7 +3,8 @@
 
 ⟨JParse⇐Parse,JExport⇐Export⟩←•Import "bqn-libs/json.bqn"
 ⟨Split , Join,  SplitL, JoinL⟩←•Import "bqn-libs/csv.bqn"
-⟨GLine, WMean, Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist⟩←•Import "pk-libs.bqn"
+⟨MP,Cholesky⟩←•Import "bqn-libs/matrix.bqn"
+⟨FmtNs, GLine, WMean, Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist⟩←•Import "pk-libs.bqn"
 
 csv ← "',/" •Import "./bqn-libs/csv.bqn"  # Easier characters to write
 csvdir ← "/media/grenada/Data/Crypto-Historical-Data/data-csv/binance/"
@@ -21,7 +22,55 @@ LdJson ←{
 }
 LdJsLc ← {⋆⁼ ¯2⊏˘ 𝕨 LdJson 𝕩‿"USDT"}
 errmea←0.1
+#######################################
+### Todos:
+#-V Parameter sweeps, continuous and discrete
+#-V Parameter deals, continuous and discrete
+#- Julia Sigma Points
+#- Merwe Scaled Sigma Points
+#- Unscented Kalman Filter
+#- UKF linear for macro
+#- UKF Fib Levels
+#- Markov Chains & UKF
+#- RL
+
+#######################################
+### Parameter Sweeping and Dealing (random selection)
+
+#- Divides interval in n parts
+RSweep ← ((↕1⊸+)×÷)⊸×⟜(-´⌽)
+#10 PSweep ⟨0,10⟩
+ISweep ← (⌊1e¯8⊸+)RSweep
+#10 ISweep ⟨0,10⟩
+
+#- Deals n numbers in interval with precision
+RDeal ← ((⊣•rand.Range ¯1⊸⊑)×((-´∘⌽2↑⊢)÷2⊸⊑))
+#10 RDeal ⟨0,10,100⟩
+#- Deals n elements from an array
+ADeal ← ((⊣ •rand.Range ≠∘⊢)⊏⊢)
+#40 ADeal 10×↕5
+#- Example deal multiple params
+#(5⊸RDeal)‿(7⊸ADeal) {𝕎𝕩}¨ ⟨0,10,100⟩‿(5+↕10)
+
+#- Cholesky Decomposition
+(cholesky.Decompose⊸⋈) (MP⟜⍉) > {(⌽(-𝕩)↑1+↕)¨1+↕𝕩} 2
+#cholesky.Decompose >⟨⟨10, 5, 2⟩,⟨5, 3, 2⟩,⟨2, 2, 3⟩⟩
+#- Merwe Scaled Sigma Points
+×˜2
+#- Merwe Sigma Points
+Merwe_Sigmas ← {
+	n‿a‿b‿k ← 𝕨
+	x‿cov←𝕩
+	l←((×˜a)×(n+k))-n 
+	c←0.5÷n+l
+	wm‿wc←(0‿(1+b-×˜a) + 2⥊l÷l+n) ∾¨ <wco←(n×2)⥊c
+	x ((<⊣)(⊣∾+¨)⊢)  <˘∾´1‿¯1×<⍉cholesky.Decompose cov×n+l
+} 
+2‿0.1‿2‿1 Merwe_Sigmas ⟨3‿4,(>⟨1‿0,2‿1⟩)⟩
+
+#######################################
 ### GH-Filter aka Kalman Filter
+###
 FGH←{
 	dt‿g‿h←𝕨
 	xpred‿xest‿dx ⇐ <˘⍉> (<(2⥊⊑𝕩)∾0){
@@ -85,40 +134,41 @@ xStra ← {
 	}
 	XRun ⇐ {XStats XPositions XExits XEntries 𝕨 XIndicators Xload 𝕩}
 }
-FmtNs ← {k←•ns.Keys 𝕩⋄⍉k≍𝕩 •ns.Get¨k}
 
-{st←𝕩.stats⋄•Show FmtNs st⋄
-	plt ← Gnuplot "
-		title 'Line plot' font ',18'
-		terminal wxt size 1300,600
-		style line 5 lt rgb 'cyan' lw 5 pt 6"
-	plt.Plot (((↕≠)∾˘⊢)𝕩.cumpnl)‿"lw 1 lc rgb 'blue' with lines"
-	"gnuplot-tmp-1.txt"•file.Chars plt.Debug @
-	•SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
+{st←𝕩.stats⋄FmtNs 𝕩.stats⋄
+#	plt ← Gnuplot "
+#		title 'Line plot' font ',18'
+#		terminal wxt size 1300,600
+#		style line 5 lt rgb 'cyan' lw 5 pt 6"
+#	plt.Plot (((↕≠)∾˘⊢)𝕩.cumpnl)‿"lw 1 lc rgb 'black' with lines"
+#	plt.Plot (((↕≠)∾˘⊢)st.maxpnl)‿"lw 1 lc rgb 'blue' with lines"
+#	plt.Plot (((↕≠)∾˘⊢)st.ddn)‿"lw 1 lc rgb 'blue' with lines"
+#	"gnuplot-tmp-1.txt"•file.Chars plt.Debug @
+#	•SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
 } ⟨0.45,0.06138,0.00598⟩ xStra.XRun "8h"‿"ALGO"‿"USDT"
 #xStra.XStats xStra.XPositions xStra.XExits xStra.XEntries⟨0.45,0.06138,0.00598⟩ xStra.XIndicators xStra.Xload "8h"‿"ALGO"‿"USDT"
-GStra ←{
-	#stra← XPositions XExits XEntries 1‿0.001‿0.001 XIndicators lc
-	stra ← 𝕩
-	ymin‿ymax← ⌊‿⌈ {𝕎 ´ 𝕩}¨<stra.xind.lc
-	ts←↕≠stra.xind.lc
-	ws‿ww←0‿(≠stra.xind.lc)
-	•Show stra.xind.ghpars
-	plt ← Gnuplot "
-		title 'G-H Filter:"∾(•Fmt stra.xind.ghpars)∾"' font ',18'
-		terminal wxt size 2200,1300
-		y2tics nomirror tc lt 2
-		style line 5 lt rgb 'cyan' lw 5 pt 6
-		style fill empty"
-	#xs←plt.Debug @
-#	plt.Plot (⍉stra.posinx≍⊏stra.cio)‿" with lines"
-	plt.Plot (ww↑ws↓ts∾˘stra.xind.lc)‿"lw 1 lc rgb 'blue' with lines"
-	plt.Plot (ww↑ws↓ts∾˘stra.xind.xest)‿"lw 1.5 with lines"
-	plt.Plot (0‿0∾⍉stra.posoutx≍stra.cumpnl)‿"lc rgb 'red' lw 1.5 with lines axes x1y2"
-	"gnuplot-tmp-1.txt"•file.Chars plt.Debug @
-	•SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
-	𝕩
-} 
+#GStra ←{
+#	#stra← XPositions XExits XEntries 1‿0.001‿0.001 XIndicators lc
+#	stra ← 𝕩
+#	ymin‿ymax← ⌊‿⌈ {𝕎 ´ 𝕩}¨<stra.xind.lc
+#	ts←↕≠stra.xind.lc
+#	ws‿ww←0‿(≠stra.xind.lc)
+#	•Show stra.xind.ghpars
+#	plt ← Gnuplot "
+#		title 'G-H Filter:"∾(•Fmt stra.xind.ghpars)∾"' font ',18'
+#		terminal wxt size 2200,1300
+#		y2tics nomirror tc lt 2
+#		style line 5 lt rgb 'cyan' lw 5 pt 6
+#		style fill empty"
+#	#xs←plt.Debug @
+##	plt.Plot (⍉stra.posinx≍⊏stra.cio)‿" with lines"
+#	plt.Plot (ww↑ws↓ts∾˘stra.xind.lc)‿"lw 1 lc rgb 'blue' with lines"
+#	plt.Plot (ww↑ws↓ts∾˘stra.xind.xest)‿"lw 1.5 with lines"
+#	plt.Plot (0‿0∾⍉stra.posoutx≍stra.cumpnl)‿"lc rgb 'red' lw 1.5 with lines axes x1y2"
+#	"gnuplot-tmp-1.txt"•file.Chars plt.Debug @
+#	•SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
+#	𝕩
+#} 
 
 #GStra XPositions XExits XEntries 1‿0.04‿0.02 XIndicators (⋆⁼ ¯2⊏˘ "8h"⊸LdJson "BTC"‿"USDT") 
 
@@ -126,11 +176,17 @@ GStra ←{
 ### Genetic Algorithm for Parameter Tuning
 ###########
 
-### Generates random parameters 
+### Generates random parameters, Floating Point
 GenRan ←	<˘∘⍉∘>((⊣ •rand.Range (2⊸⊑⊢))×((2⊸⊑÷˜⟜(1⊸⊑-⊑))⊢))¨ 
 3 GenRan ⟨0,10,100⟩‿⟨0,1,100⟩
 ### Objective function
-Obj← {stra←XPositions XExits XEntries 𝕩 XIndicators (⋆⁼ ¯2⊏˘ "8h"⊸LdJson "EGLD"‿"USDT") ⋄ ¯1⊑(0∾stra.cumpnl)}
+{𝕏 2.71} ÷
+
+### Optimizes Max Drawdown
+Obj← { {𝕩.stats.toppnl} 𝕩 xStra.XRun "8h"‿"ALGO"‿"USDT" }
+#Optimizes PNL
+#Obj← {stra←XPositions XExits XEntries 𝕩 XIndicators (⋆⁼ ¯2⊏˘ "8h"⊸LdJson "LINK"‿"USDT") ⋄ ¯1⊑(0∾stra.cumpnl)}
+
 #((Obj¨ <˘))
 ### Calculate Obj on list of params
 #>(⋈⟜Obj)¨ 5 GenRan ⟨0,10,100⟩‿⟨0,1,100⟩‿⟨0,1,100⟩
@@ -141,13 +197,13 @@ Mutate ← {
 }
 Genetic ← {
 	pardefs ← 𝕩
-	niter‿ntop‿nper‿nmut ← 𝕨
+	niter‿ntop‿nper ← 𝕨
 	(>(⋈⟜Obj)¨ nper GenRan pardefs) {
-		ntop ↑ ((⍒¯1⊸⊏˘)⊸⊏) 𝕩∾ >(⋈⟜Obj)¨  (⊏˘𝕩) (¬∘∊˜/⊢) (nper GenRan pardefs)∾(Mutate ⊏˘𝕩)
+		ntop ↑ ((⍒1⊸⊏˘)⊸⊏) 𝕩∾ >(⋈⟜Obj)¨  (⊏˘𝕩) (¬∘∊˜/⊢) (nper GenRan pardefs)∾(Mutate ⊏˘𝕩)
 		
 	}´ ↕niter
  }
-{"strat-params.csv" •FLines •Fmt¨ <˘𝕩⋄𝕩} 10‿20‿10‿10 Genetic ⟨1,4,20⟩‿⟨0.001,0.1,100⟩‿⟨0.001,0.3,100⟩
+{"strat-params.csv" •FLines •Fmt¨ <˘𝕩⋄𝕩} 50‿20‿20 Genetic ⟨0,5,10⟩‿⟨0.0,1,100⟩‿⟨0.0,1,1000⟩
  
 3.05‿0.05‿0.22
 0.7‿0.01‿0.222

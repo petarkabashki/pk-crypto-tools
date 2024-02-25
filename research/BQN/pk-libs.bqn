@@ -1,6 +1,6 @@
 # Comma-separated values (.csv)
 ⟨
-  GLine, WMean , Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist
+  FmtNs, GLine, WMean , Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist
 ⟩⇐
 
 
@@ -105,3 +105,6 @@ GLine← {
 	"gnuplot-tmp-1.txt"•file.Chars plt.Debug @
 	•SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
 }
+
+### Format a namespace into a table of key/values
+FmtNs ← {k←•ns.Keys 𝕩⋄⍉k≍𝕩 •ns.Get¨k}
