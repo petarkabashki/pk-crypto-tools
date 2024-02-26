@@ -3,7 +3,8 @@
 
 ⟨JParse⇐Parse,JExport⇐Export⟩←•Import "bqn-libs/json.bqn"
 ⟨Split , Join,  SplitL, JoinL⟩←•Import "bqn-libs/csv.bqn"
-⟨MP,Cholesky⟩←•Import "bqn-libs/matrix.bqn"
+⟨MP,Cholesky,Inverse⟩←•Import "bqn-libs/matrix.bqn"
+#1‿1 MP 2‿2⥊4
 ⟨FmtNs, GLine, WMean, Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist⟩←•Import "pk-libs.bqn"
 
 csv ← "',/" •Import "./bqn-libs/csv.bqn"  # Easier characters to write
@@ -52,25 +53,88 @@ ADeal ← ((⊣ •rand.Range ≠∘⊢)⊏⊢)
 #- Example deal multiple params
 #(5⊸RDeal)‿(7⊸ADeal) {𝕎𝕩}¨ ⟨0,10,100⟩‿(5+↕10)
 
+#- Covariance
+ Cov← {n←≠⊑𝕩⋄n÷˜+´×´(⊢-n÷˜+´)¨𝕩} 
+ #Cov {a‿v←4‿3⋄(a+𝕩×v)⋈(≠𝕩)⥊v} ↕10
+
 #- Cholesky Decomposition
-(cholesky.Decompose⊸⋈) (MP⟜⍉) > {(⌽(-𝕩)↑1+↕)¨1+↕𝕩} 2
+#(cholesky.Decompose⊸⋈) (MP⟜⍉) > {(⌽(-𝕩)↑1+↕)¨1+↕𝕩} 2
 #cholesky.Decompose >⟨⟨10, 5, 2⟩,⟨5, 3, 2⟩,⟨2, 2, 3⟩⟩
 #- Merwe Scaled Sigma Points
-×˜2
-#- Merwe Sigma Points
 Merwe_Sigmas ← {
-	n‿a‿b‿k ← 𝕨
-	x‿cov←𝕩
+	n‿a‿b‿k ← 𝕩
 	l←((×˜a)×(n+k))-n 
 	c←0.5÷n+l
-	wm‿wc←(0‿(1+b-×˜a) + 2⥊l÷l+n) ∾¨ <wco←(n×2)⥊c
-	x ((<⊣)(⊣∾+¨)⊢)  <˘∾´1‿¯1×<⍉cholesky.Decompose cov×n+l
+	wm‿wc⇐(0‿(1+b-×˜a) + 2⥊l÷l+n) ∾¨ <wco←(n×2)⥊c
+	Points⇐{
+		x‿cov←𝕩
+		x ((<⊣)(⊣∾+¨)⊢)  <˘∾´1‿¯1×<⍉cholesky.Decompose cov×n+l
+	}
 } 
-2‿0.1‿2‿1 Merwe_Sigmas ⟨3‿4,(>⟨1‿0,2‿1⟩)⟩
+(Merwe_Sigmas 2‿0.1‿2‿1).Points ⟨3‿4,(>⟨1‿0,2‿1⟩)⟩
+
+#- Discrete white noise in 2-dim, check inconsistency with FilterPy
+Q_dwn_2⇐ {dt‿var←𝕩⋄sq←×˜dt⋄var× 2‿2⥊(0.25×˜sq)∾(2⥊0.5×sq×dt)∾sq }
+#Q_dwn_2 1‿0.02
+
+2‿2⥊1⌽4↑2⥊3
+
+
+UKF←{
+	dt‿std_x‿std_r‿sig‿⟨a‿b‿k⟩ ← 𝕩
+	Fx⇐ {x‿dx←𝕩⋄(x+dt×dx)‿dx}
+	sigmaF⇐Merwe_Sigmas 2‿0.5‿2‿(3-2)
+	Hx⇐0⊸⊑
+	hmat←1‿0
+	q⇐ Q_dwn_2 dt‿(×˜std_x)
+	r⇐2‿2⥊1⌽4↑2⥊×˜std_r
+	#Pred⇐ +´f⊸×
+	H⇐⊑hmat⊸×
+	p_init⇐2‿2⥊1‿0‿0‿1
+	UT← {
+			x← +´sigmaF.wm × 𝕩
+			#•Show x
+			p← 𝕨+ +´sigmaF.wc × (×⌜˜)¨ 𝕩 - <x
+			x‿p
+	}
+	Filter⇐{
+		x_init←(⊑𝕩)‿(-´1‿0⊏𝕩)
+		(<x_init‿p_init){
+			•Show "--------------------------"
+			px‿pp← 0‿1⊏𝕨	
+			sigmas← sigmaF.Points px‿pp
+			y_si← Fx¨ sigmas
+			x‿p ← q UT y_si
+			z← Hx¨ y_si
+			z_mu‿z_p← r UT z 
+			y← 𝕩 - z_mu
+			p_xz← +´sigma_F.wc×(y_si-¨<x) (×⌜)¨ (z-z_mu)
+			k← p_xz MP Inverse z_p
+			ux← x+ k MP y
+			up← p - k MP z_p MP ⍉k
+			ux‿up
+			𝕨
+		}`𝕩
+	}
+} 
+
+{𝕩.Filter 3×↕5}UKF 1‿0.03‿0.3‿0.2‿⟨0.1‿2‿1⟩
+{𝕩.Pred 1‿2}UKF 1‿0.3‿⟨0.1‿2‿1⟩
+###- All in one
+#Merwe_Sigmas ← {
+#	n‿a‿b‿k ← 𝕨
+#	x‿cov←𝕩
+#	l←((×˜a)×(n+k))-n 
+#	c←0.5÷n+l
+#	wm‿wc←(0‿(1+b-×˜a) + 2⥊l÷l+n) ∾¨ <wco←(n×2)⥊c
+#	x ((<⊣)(⊣∾+¨)⊢)  <˘∾´1‿¯1×<⍉cholesky.Decompose cov×n+l
+#} 
+#2‿0.1‿2‿1 Merwe_Sigmas ⟨3‿4,(>⟨1‿0,2‿1⟩)⟩
 
 #######################################
 ### GH-Filter aka Kalman Filter
 ###
+⟨1,0⟩‿⟨2,4⟩
 FGH←{
 	dt‿g‿h←𝕨
 	xpred‿xest‿dx ⇐ <˘⍉> (<(2⥊⊑𝕩)∾0){
