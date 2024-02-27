@@ -3,7 +3,7 @@
 
 ⟨JParse⇐Parse,JExport⇐Export⟩←•Import "bqn-libs/json.bqn"
 ⟨Split , Join,  SplitL, JoinL⟩←•Import "bqn-libs/csv.bqn"
-⟨MP,Cholesky,Inverse⟩←•Import "bqn-libs/matrix.bqn"
+⟨MP, Cholesky,Inverse⟩←•Import "bqn-libs/matrix.bqn"
 #1‿1 MP 2‿2⥊4
 ⟨FmtNs, GLine, WMean, Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist⟩←•Import "pk-libs.bqn"
 
@@ -74,52 +74,83 @@ Merwe_Sigmas ← {
 (Merwe_Sigmas 2‿0.1‿2‿1).Points ⟨3‿4,(>⟨1‿0,2‿1⟩)⟩
 
 #- Discrete white noise in 2-dim, check inconsistency with FilterPy
-Q_dwn_2⇐ {dt‿var←𝕩⋄sq←×˜dt⋄var× 2‿2⥊(0.25×˜sq)∾(2⥊0.5×sq×dt)∾sq }
+Q_dwn_2⇐ {sq←×˜𝕨⋄𝕩× 2‿2⥊(0.25×˜sq)∾(2⥊0.5×sq×𝕨)∾sq }
+Q_dwn_4← {𝕩×(𝕨⋆<˘⌽⌽˘(↕+2⊸⥊⥊↕) 4) ÷ ⟨36,12,6,6⟩‿⟨12,4,2,2⟩‿⟨6,2,2,1⟩‿⟨6,2,1,1⟩ }
 #Q_dwn_2 1‿0.02
+#- Makes a new matrix double the size, placing the argument matrix in diagonal
+MkTri← (2‿2⥊0)⊸(∾˘´∘(∾¨⌽⊸⋈)⋈) 
+#MkTri 1 Q_dwn_2 0.02
 
-2‿2⥊1⌽4↑2⥊3
-
+Diag ← {𝕩⌾(0‿0⊸⍉)0⌜˜𝕩}
 
 UKF←{
-	dt‿std_x‿std_r‿sig‿⟨a‿b‿k⟩ ← 𝕩
-	Fx⇐ {x‿dx←𝕩⋄(x+dt×dx)‿dx}
-	sigmaF⇐Merwe_Sigmas 2‿0.5‿2‿(3-2)
-	Hx⇐0⊸⊑
-	hmat←1‿0
-	q⇐ Q_dwn_2 dt‿(×˜std_x)
-	r⇐2‿2⥊1⌽4↑2⥊×˜std_r
-	#Pred⇐ +´f⊸×
-	H⇐⊑hmat⊸×
-	p_init⇐2‿2⥊1‿0‿0‿1
+	dt‿std_x‿std_r‿⟨a‿b‿k⟩ ← 𝕩
+	f←4‿4 ⥊ 1‿dt‿0‿0‿0‿1‿0‿0‿0‿0‿1‿dt‿0‿0‿0
+	Fx←f⊸MP
+	Hx←0‿2⊸⊏
+	sigmaF⇐Merwe_Sigmas 4‿0.1‿2‿1
+	q← MkTri 1 Q_dwn_2 0.02
+	r←Diag 2⥊std_r⋆2
+	x_ini←4⥊0
+	p_ini←Diag 4⥊1
 	UT← {
+#			•Show "--------- UT ------------"
+#			•Show "q:"
+#			•Show 𝕨
+#			•Show "sigmas"
+#			•Show >𝕩
 			x← +´sigmaF.wm × 𝕩
-			#•Show x
 			p← 𝕨+ +´sigmaF.wc × (×⌜˜)¨ 𝕩 - <x
+#			•Show "x:"
+#			•Show x
+#			•Show "p"
+#			•Show p
 			x‿p
 	}
+#	•Show "====================================="
+#	•Show (≠⋈⊢) sigmaF.wm
+#	•Show (≠⋈⊢) sigmaF.wc
+#	•Show (<"Q:")⋈q
 	Filter⇐{
-		x_init←(⊑𝕩)‿(-´1‿0⊏𝕩)
-		(<x_init‿p_init){
+		(<x_ini‿p_ini){
 			•Show "--------------------------"
 			px‿pp← 0‿1⊏𝕨	
 			sigmas← sigmaF.Points px‿pp
+			#•Show ("sigmas:")
+			#•Show sigmas
 			y_si← Fx¨ sigmas
+			#•Show "Process sigmas:"
+			#•Show >y_si
 			x‿p ← q UT y_si
 			z← Hx¨ y_si
+			#•Show >z
 			z_mu‿z_p← r UT z 
-			y← 𝕩 - z_mu
-			p_xz← +´sigma_F.wc×(y_si-¨<x) (×⌜)¨ (z-z_mu)
-			k← p_xz MP Inverse z_p
-			ux← x+ k MP y
+			#•Show z_mu
+			#•Show z_p
+			si←Inverse z_p
+			#•Show si
+			#y← 𝕩 - z_mu
+			p_xz← +´sigma_F.wc×(y_si-¨<x) (×⌜)¨ (z-¨<z_mu)
+			#•Show p_xz
+			k← p_xz MP si
+			z_resi←𝕩-z_mu
+			#•Show z_resi
+			#•Show k
+			ux← x+ k MP z_resi
+			•Show ux
 			up← p - k MP z_p MP ⍉k
+			#•Show up
 			ux‿up
-			𝕨
 		}`𝕩
 	}
 } 
 
-{𝕩.Filter 3×↕5}UKF 1‿0.03‿0.3‿0.2‿⟨0.1‿2‿1⟩
-{𝕩.Pred 1‿2}UKF 1‿0.3‿⟨0.1‿2‿1⟩
+#- Test with data from the book
+zs←<˘1↓˘ >•ParseFloat¨¨ 1↓ csv.SplitL •FLines "sym.csv"
+{𝕩.Filter 10↑zs}UKF 1‿0.03‿0.3‿⟨0.1‿2‿1⟩
+
+#{𝕩.Filter 3×↕5}UKF 1‿0.03‿0.3‿0.2‿⟨0.1‿2‿1⟩
+#{𝕩.Pred 1‿2}UKF 1‿0.3‿⟨0.1‿2‿1⟩
 ###- All in one
 #Merwe_Sigmas ← {
 #	n‿a‿b‿k ← 𝕨
