@@ -39,8 +39,9 @@ errmea←0.1
 ### Parameter Sweeping and Dealing (random selection)
 
 #- Divides interval in n parts
-RSweep ← ((↕1⊸+)×÷)⊸×⟜(-´⌽)
-#10 PSweep ⟨0,10⟩
+#RSweep ← ((↕1⊸+)×÷)⊸×⟜(-´⌽)
+RSweep← {s‿e←𝕩⋄d←(e-s)÷𝕨⋄s+d×↕1+𝕨}
+10 RSweep ⟨5,10⟩
 ISweep ← (⌊1e¯8⊸+)RSweep
 #10 ISweep ⟨0,10⟩
 
@@ -82,72 +83,123 @@ MkTri← (2‿2⥊0)⊸(∾˘´∘(∾¨⌽⊸⋈)⋈)
 #MkTri 1 Q_dwn_2 0.02
 
 Diag ← {𝕩⌾(0‿0⊸⍉)0⌜˜𝕩}
-
+###- Unscented Kalman Filter
 UKF←{
 	dt‿std_x‿std_r‿⟨a‿b‿k⟩ ← 𝕩
 	f←4‿4 ⥊ 1‿dt‿0‿0‿0‿1‿0‿0‿0‿0‿1‿dt‿0‿0‿0
-	Fx←f⊸MP
-	Hx←0‿2⊸⊏
-	sigmaF⇐Merwe_Sigmas 4‿0.1‿2‿1
-	q← MkTri 1 Q_dwn_2 0.02
-	r←Diag 2⥊std_r⋆2
-	x_ini←4⥊0
-	p_ini←Diag 4⥊1
+	Fx←f⊸MP⋄Hx←0‿2⊸⊏⋄sigmaF⇐Merwe_Sigmas 4‿0.1‿2‿1
+	q← MkTri 1 Q_dwn_2 0.02⋄r←Diag 2⥊std_r⋆2
+	x_ini←4⥊0⋄p_ini←Diag 4⥊1
 	UT← {
-#			•Show "--------- UT ------------"
-#			•Show "q:"
-#			•Show 𝕨
-#			•Show "sigmas"
-#			•Show >𝕩
 			x← +´sigmaF.wm × 𝕩
 			p← 𝕨+ +´sigmaF.wc × (×⌜˜)¨ 𝕩 - <x
-#			•Show "x:"
-#			•Show x
-#			•Show "p"
-#			•Show p
 			x‿p
 	}
-#	•Show "====================================="
-#	•Show (≠⋈⊢) sigmaF.wm
-#	•Show (≠⋈⊢) sigmaF.wc
-#	•Show (<"Q:")⋈q
 	Filter⇐{
 		(<x_ini‿p_ini){
-			•Show "--------------------------"
 			px‿pp← 0‿1⊏𝕨	
 			sigmas← sigmaF.Points px‿pp
-			#•Show ("sigmas:")
-			#•Show sigmas
 			y_si← Fx¨ sigmas
-			#•Show "Process sigmas:"
-			#•Show >y_si
 			x‿p ← q UT y_si
 			z← Hx¨ y_si
-			#•Show >z
 			z_mu‿z_p← r UT z 
-			#•Show z_mu
-			#•Show z_p
 			si←Inverse z_p
-			#•Show si
-			#y← 𝕩 - z_mu
 			p_xz← +´sigma_F.wc×(y_si-¨<x) (×⌜)¨ (z-¨<z_mu)
-			#•Show p_xz
 			k← p_xz MP si
 			z_resi←𝕩-z_mu
-			#•Show z_resi
-			#•Show k
-			ux← x+ k MP z_resi
-			•Show ux
-			up← p - k MP z_p MP ⍉k
-			#•Show up
+			ux← x+k MP z_resi
+			up← p-k MP z_p MP ⍉k
 			ux‿up
 		}`𝕩
 	}
 } 
 
 #- Test with data from the book
-zs←<˘1↓˘ >•ParseFloat¨¨ 1↓ csv.SplitL •FLines "sym.csv"
-{𝕩.Filter 10↑zs}UKF 1‿0.03‿0.3‿⟨0.1‿2‿1⟩
+#zs←<˘1↓˘ >•ParseFloat¨¨ 1↓ csv.SplitL •FLines "sym.csv"
+#{𝕩.Filter 10↑zs}UKF 1‿0.03‿0.3‿⟨0.1‿2‿1⟩
+
+Diag 500‿49
+###- Linear Kalman Filter
+LKF←{
+	dt‿q_var‿r_var ← 𝕩
+	f←(2‿2 ⥊ 1‿dt‿0‿1)⋄h←(≍1‿0)⋄
+	q← 1 Q_dwn_2 q_var⋄
+	r←Diag 1⥊r_var
+	x_ini←(⊑𝕩)‿0⋄p_ini←Diag 2⥊1
+
+	#x_ini←(⍉≍10‿4.5) 
+	#p_ini←Diag 500‿49
+	Filter⇐{
+		(<⟨x_ini,p_ini⟩‿⟨x_ini,p_ini⟩){
+⟨·,·⟩‿⟨px,pp⟩← 0‿1⊏𝕨	
+			x_pred← f MP px
+			p_pred← (f MP pp MP ⍉f) + q
+			s← (h MP p_pred MP ⍉h) + r
+			k← p_pred MP (⍉h) MP Inverse s
+			y← 𝕩 - h MP x_pred # residual
+			ux← x_pred + k MP y
+			up← p_pred - k MP h MP p_pred
+			⟨x_pred,p_pred⟩‿⟨ux,up⟩
+		}`𝕩
+	}
+} 
+###- Test against the book implementation
+#zs‿track ← <˘1↓⍉>•ParseFloat¨¨  1↓ csv.SplitL •FLines "nofpy.csv"
+#xps←>{𝕩.Filter zs} LKF 1‿0.01‿10
+
+
+#≢z←"1w" LdJsLc "SOL" 
+4↑ohlc← "1h" {⋆⁼ ¯1↓˘1↓˘ 𝕨 LdJson 𝕩‿"USDT"} "ADA"
+z←¯1⊏˘ohlc
+XPred ← {
+	pred‿flt←<˘⍉> 𝕩
+	xv‿p←<˘⍉>pred
+	x‿v←<˘⍉>xv
+	x
+}
+ParLKF← {XPred 𝕩.Filter z} LKF 
+#5 RSweep ⟨0.1,2.0⟩
+#pars← {𝕩‿0.01‿0.1}¨ 0.1‿0.01‿0.0001#10⋆2×↕3
+⋆(↕-(⌊÷⟜2)) 5
+pars← {0.0001‿0.01‿𝕩}¨ ⋆ 3×(↕-(⌊÷⟜2)) 3
+ #÷10⋆1+↕5
+#xs← (⋈⟜ParLKF)¨ pars
+
+xs←pars ⋈¨ k1‿k2‿k3← (ParLKF)¨ pars
+≠ohlc
+icnd← (k2>k3) ∧ (k1>k2)
+isig←icnd∧¬»icnd
+osig← (∧⟜(»¬)) k1<k2
++´isig
+ixin‿polen‿ixout← <˘(⊢∾(1505⌊+˝)) ⍉>(/isig) ⋈¨ (+´∘¬∨`)¨ 1↓ (+`isig) ⊔ osig
+>ixin‿ixout‿polen
+
+pin‿pout←<˘(>ixin‿ixout) ⊏ z
+>pin‿pout
+≠pin
+pnl←pin-pout
++´pnl
+
+(⍋⊏⊢) pnl
+⍉10 CumBins pnl
+20 Hist pnl
+#ws←500⋄we←ws+1200⋄ww←we-ws+1
+ws←0⋄we←(≠1⊑⊑xs)⋄ww←we-ws+1
+plt ← Gnuplot "
+	title 'Linear Kalman Filter' font ',18'
+	terminal wxt size 2300,900
+	style line 5 lt rgb 'cyan' lw 5 pt 6"
+plt.Plot (((↕≠)∾˘⊢)ohlc)‿"lw 1 with financebars title 'price'"
+#plt.Plot (((↕≠)∾˘⊢)ww↑ws↓ohlc)‿"lw 1 with financebars title 'price'"
+#plt.Plot (((↕≠)∾˘⊢)ww↑ws↓ohlc)‿"lw 1 with candlesticks whiskerbars 0.5 title 'price'"
+#plt.Plot (((↕≠)∾˘⊢)ww↑ws↓z)‿"lw 3 lc rgb 'black' with lines title 'price'"
+{p‿x←𝕩⋄s←"lw 2 with lines title '"∾(•Fmt p)∾"'"⋄•Show s⋄plt.Plot (((↕≠)∾˘⊢)x)‿s}¨xs
+plt.Plot (⍉>ixin‿pin)‿"with points pt 9 lw 3 lc rgb 'green'"
+plt.Plot (⍉>ixout‿pout)‿"with points pt 9 lw 3 lc rgb 'red'"
+"gnuplot-tmp-1.txt"•file.Chars plt.Debug @
+•SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
+
+
 
 #{𝕩.Filter 3×↕5}UKF 1‿0.03‿0.3‿0.2‿⟨0.1‿2‿1⟩
 #{𝕩.Pred 1‿2}UKF 1‿0.3‿⟨0.1‿2‿1⟩
