@@ -149,7 +149,7 @@ LKF←{
 
 
 #≢z←"1w" LdJsLc "SOL" 
-4↑ohlc← "1h" {⋆⁼ ¯1↓˘1↓˘ 𝕨 LdJson 𝕩‿"USDT"} "ADA"
+4↑ohlc← 9↓ "4h" {⋆⁼ ¯1↓˘1↓˘ 𝕨 LdJson 𝕩‿"USDT"} "ALGO"
 z←¯1⊏˘ohlc
 XPred ← {
 	pred‿flt←<˘⍉> 𝕩
@@ -161,43 +161,50 @@ ParLKF← {XPred 𝕩.Filter z} LKF
 #5 RSweep ⟨0.1,2.0⟩
 #pars← {𝕩‿0.01‿0.1}¨ 0.1‿0.01‿0.0001#10⋆2×↕3
 ⋆(↕-(⌊÷⟜2)) 5
-pars← {0.0001‿0.01‿𝕩}¨ ⋆ 3×(↕-(⌊÷⟜2)) 3
+pars← {0.0001‿0.01‿𝕩}¨ 7‿21‿50 #10×(↕-(⌊÷⟜2)) 3
  #÷10⋆1+↕5
 #xs← (⋈⟜ParLKF)¨ pars
 
 xs←pars ⋈¨ k1‿k2‿k3← (ParLKF)¨ pars
-≠ohlc
-icnd← (k2>k3) ∧ (k1>k2)
-isig←icnd∧¬»icnd
-osig← (∧⟜(»¬)) k1<k2
-+´isig
-ixin‿polen‿ixout← <˘(⊢∾(1505⌊+˝)) ⍉>(/isig) ⋈¨ (+´∘¬∨`)¨ 1↓ (+`isig) ⊔ osig
->ixin‿ixout‿polen
-
+4↑odata←ohlc(∾)˘k1∾˘k2∾˘k3
+pos‿isig‿osig←<˘⍉>(<0‿0‿0){
+	in_pos‿sig_in‿sig_out←𝕨
+	o‿h‿l‿c‿k1‿k2‿k3←𝕩
+	xin←(k1>k2)∧(k2>k3)∧¬in_pos⋄
+	xout←(k1<k2)∧in_pos
+	xin_pos←(xin∧¬in_pos)∨(in_pos∧¬xout)
+	xin_pos‿xin‿xout
+}`<˘odata
++´¨pos‿isig‿osig
+ixin‿ixout←<˘(/isig) {𝕨≍𝕩∾((≠𝕨)>≠𝕩)⥊¯1+≠ohlc} /osig
 pin‿pout←<˘(>ixin‿ixout) ⊏ z
->pin‿pout
-≠pin
-pnl←pin-pout
-+´pnl
+#ww←≠ohlc⋄ws←0⋄we←ws+ww
+#ws←100⋄we←3000⋄ww←we-ws
+ws←100⋄ww←1000⋄¯1+(≠ohlc)⌈we←ws+ww
 
-(⍋⊏⊢) pnl
-⍉10 CumBins pnl
-20 Hist pnl
-#ws←500⋄we←ws+1200⋄ww←we-ws+1
-ws←0⋄we←(≠1⊑⊑xs)⋄ww←we-ws+1
+ixs← ws+↕ww
+wohlc←ww↑ws↓ohlc
+{(+´¬ixin≥ws)↓(-+´ixout>we)↓𝕩}
+wpmask←(ixout<we)∧(ixin>ws)
+(+´ixin<ws)
+(+´ixout>we)
+⍉>wixin‿wixout‿wpin‿wpout←{(+´¬ixin≥ws)↓(-+´ixout>we)↓𝕩}¨ ixin‿ixout‿pin‿pout
+wpnl←-wpin-wpout
+wcumpnl←+`wpnl
 plt ← Gnuplot "
 	title 'Linear Kalman Filter' font ',18'
 	terminal wxt size 2300,900
+	y2tics nomirror tc lt 2
 	style line 5 lt rgb 'cyan' lw 5 pt 6"
-plt.Plot (((↕≠)∾˘⊢)ohlc)‿"lw 1 with financebars title 'price'"
-#plt.Plot (((↕≠)∾˘⊢)ww↑ws↓ohlc)‿"lw 1 with financebars title 'price'"
-#plt.Plot (((↕≠)∾˘⊢)ww↑ws↓ohlc)‿"lw 1 with candlesticks whiskerbars 0.5 title 'price'"
-#plt.Plot (((↕≠)∾˘⊢)ww↑ws↓z)‿"lw 3 lc rgb 'black' with lines title 'price'"
-{p‿x←𝕩⋄s←"lw 2 with lines title '"∾(•Fmt p)∾"'"⋄•Show s⋄plt.Plot (((↕≠)∾˘⊢)x)‿s}¨xs
-plt.Plot (⍉>ixin‿pin)‿"with points pt 9 lw 3 lc rgb 'green'"
-plt.Plot (⍉>ixout‿pout)‿"with points pt 9 lw 3 lc rgb 'red'"
+plt.Plot (⍉>wixin‿wpin)‿"with points pt 9 lw 6 lc rgb 'green'"
+plt.Plot (⍉>wixout‿wpout)‿"with points pt 9 lw 6 lc rgb 'red'"
+plt.Plot (ixs∾˘wohlc)‿"lw 1 with financebars title 'price'"
+{p‿x←𝕩⋄s←"lw 2 with lines title '"∾(•Fmt p)∾"'"⋄•Show s⋄plt.Plot (ixs∾˘ww↑ws↓x)‿s}¨xs
+plt.Plot (((⊑wixin)‿0)∾wixout∾˘wcumpnl)‿"lc rgb 'red' lw 1.5 with lines axes x1y2"
 "gnuplot-tmp-1.txt"•file.Chars plt.Debug @
 •SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
+
+
 
 
 
