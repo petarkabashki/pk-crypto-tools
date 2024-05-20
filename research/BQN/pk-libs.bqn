@@ -89,7 +89,7 @@ HBins ← {
 ### Histogram
 Hist ← "Histogram" GBars (>(+´(÷⋈⊢)≠)¨)∘HBins 
 #100 Hist  ⋆⟜2 ↕10
-
+	
 ### Histogram in %
 #30 (⍉∘>∘((0⊸⊏)≍((⊢÷+´)1⊸⊏))∘⍉∘>(+´(÷⋈⊢)≠)¨)∘HBins 2000+ ⋆⟜3 ¯5000+↕10000
 

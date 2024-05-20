@@ -45,14 +45,6 @@ RSweep← {s‿e←𝕩⋄d←(e-s)÷𝕨⋄s+d×↕1+𝕨}
 ISweep ← (⌊1e¯8⊸+)RSweep
 #10 ISweep ⟨0,10⟩
 
-#- Deals n numbers in interval with precision
-RDeal ← ((⊣•rand.Range ¯1⊸⊑)×((-´∘⌽2↑⊢)÷2⊸⊑))
-#10 RDeal ⟨0,10,100⟩
-#- Deals n elements from an array
-ADeal ← ((⊣ •rand.Range ≠∘⊢)⊏⊢)
-#40 ADeal 10×↕5
-#- Example deal multiple params
-#(5⊸RDeal)‿(7⊸ADeal) {𝕎𝕩}¨ ⟨0,10,100⟩‿(5+↕10)
 
 #- Covariance
  Cov← {n←≠⊑𝕩⋄n÷˜+´×´(⊢-n÷˜+´)¨𝕩} 
@@ -118,10 +110,9 @@ UKF←{
 #zs←<˘1↓˘ >•ParseFloat¨¨ 1↓ csv.SplitL •FLines "sym.csv"
 #{𝕩.Filter 10↑zs}UKF 1‿0.03‿0.3‿⟨0.1‿2‿1⟩
 
-Diag 500‿49
 ###- Linear Kalman Filter
 LKF←{
-	dt‿q_var‿r_var ← 𝕩
+	dt‿q_var‿r_var ← 𝕨
 	f←(2‿2 ⥊ 1‿dt‿0‿1)⋄h←(≍1‿0)⋄
 	q← 1 Q_dwn_2 q_var⋄
 	r←Diag 1⥊r_var
@@ -129,76 +120,158 @@ LKF←{
 
 	#x_ini←(⍉≍10‿4.5) 
 	#p_ini←Diag 500‿49
-	Filter⇐{
-		(<⟨x_ini,p_ini⟩‿⟨x_ini,p_ini⟩){
-⟨·,·⟩‿⟨px,pp⟩← 0‿1⊏𝕨	
-			x_pred← f MP px
-			p_pred← (f MP pp MP ⍉f) + q
-			s← (h MP p_pred MP ⍉h) + r
-			k← p_pred MP (⍉h) MP Inverse s
-			y← 𝕩 - h MP x_pred # residual
-			ux← x_pred + k MP y
-			up← p_pred - k MP h MP p_pred
-			⟨x_pred,p_pred⟩‿⟨ux,up⟩
-		}`𝕩
-	}
+	(<x_ini‿p_ini){
+		⟨px,pp⟩← 0‿1⊏𝕨	
+		x_pred← f MP px
+		p_pred← (f MP pp MP ⍉f) + q
+		s← (h MP p_pred MP ⍉h) + r
+		k← p_pred MP (⍉h) MP Inverse s
+		y← 𝕩 - h MP x_pred # residual
+		ux← x_pred + k MP y
+		up← p_pred - k MP h MP p_pred
+		⟨ux,up⟩
+	}`𝕩
 } 
 ###- Test against the book implementation
 #zs‿track ← <˘1↓⍉>•ParseFloat¨¨  1↓ csv.SplitL •FLines "nofpy.csv"
 #xps←>{𝕩.Filter zs} LKF 1‿0.01‿10
-
-
-#≢z←"1w" LdJsLc "SOL" 
-4↑ohlc← 9↓ "1h" {⋆⁼ ¯1↓˘1↓˘ 𝕨 LdJson 𝕩‿"USDT"} "XLM"
-z←¯1⊏˘ohlc
-XPred ← {
-	pred‿flt←<˘⍉> 𝕩
-	xv‿p←<˘⍉>pred
-	#x‿v←<˘⍉>xv
-	xv
+#- Strategy Stats
+XStats ⇐ {
+		pnl‿cumpnl⇐𝕩
+		ret⇐¯1⊑0∾cumpnl
+		ntrades⇐≠pnl⋄nwins⇐+´pnl>0⋄nlosses⇐ntrades-nwins⋄winratio⇐nwins÷ntrades⋄
+		wins⇐(0⊸<⊸/)pnl⋄losses⇐(0⊸≥⊸/)pnl⋄avgwin⇐(+´÷≠)wins⋄avgloss⇐(+´÷≠)losses⋄
+		maxpnl⇐⌈`cumpnl
+		ddn⇐-maxpnl-cumpnl
+		maxddn⇐⌊´ddn
+		vol⇐√Var pnl
+		sharpe⇐ret÷vol
+		toppnl⇐⌈´maxpnl
+ 	#stats⇐>⟨"#Trades:"‿ntrades, "#Wins:"‿nwins⟩
+ 	#•Show cumpnl
+	#XRun ⇐ {XStats XPositions XExits XEntries 𝕨 XIndicators Xload 𝕩}
 }
-ParLKF← {XPred 𝕩.Filter z} LKF 
+WPos← { ws‿ww←𝕨⋄we←ws+ww⋄
+	ixin‿ixout‿pin‿pout‿pnl‿cumpnl← 𝕩
+
+	wpmask←(ixout<we)∧(ixin>ws)
+	wixin‿wixout‿wpin‿wpout←{(+´¬ixin≥ws)↓(-+´ixout>we)↓𝕩}¨ ixin‿ixout‿pin‿pout
+	wcumpnl←+`wpnl←(¯0.002)+ -wpin-wpout
+	wixin‿wixout‿wpin‿wpout‿wpnl‿wcumpnl
+}
+
+
+XRun ← {
+	vthr‿tpthr ← 𝕨
+	pos‿isig‿osig‿pent←<˘⍉>(<0‿0‿0‿0){
+		in_pos‿sig_in‿sig_out‿p_in←𝕨
+		o‿h‿l‿c‿k1‿v1←𝕩
+		xin←(¬in_pos)∧ (v1>vthr) ∧ (c>k1) ∧ (l<k1)
+		xout←in_pos∧ ((c<k1) ∨ (c>tpthr))
+		#o‿h‿l‿c‿⟨k1,v1⟩‿⟨k2,v2⟩‿⟨k3,v3⟩←𝕩
+		#xin←(¬in_pos)∧ (v2>0.01) ∧ (v3>0.01) ∧(k1>k2)∧(k2>k3) 
+		#xout←in_pos∧ ((k1<k2)∨(k2<k3)) #∨(¯0.1>c-p_in)) (0.3<c-k1)∨
+		xin_pos←(xin∧¬in_pos)∨(in_pos∧¬xout)
+		xp_in←(xin×c)+(p_in×in_pos)
+		xin_pos‿xin‿xout‿(xp_in)
+	}`<˘𝕩
+	ixin‿ixout←<˘(/isig) {𝕨≍𝕩∾((≠𝕨)>≠𝕩)⥊¯1+≠𝕩} / (¯1⊸↓ ∾ ¯1⊸⊑⟜pos) osig
+	c←3⊑˘𝕩 # close price
+	cumpnl←+`pnl←--´pin‿pout←<˘(>ixin‿ixout) ⊏ c
+	ixin‿ixout‿pin‿pout‿pnl‿cumpnl
+}
+#3↑odata←0.001‿0.01‿10 XInd "1d"‿"SOL"
+#3↑⍉>pos←0.01 XRun <˘odata
+#FmtNs XStats ¯2↑pos
+LnOhlc← {⋆⁼ ¯1↓˘1↓˘ 𝕨 LdJson 𝕩‿"USDT"} 
+lohlc← "1d" LnOhlc "AVAX"
+#¯1↑ ↕5
+### Objective function
+⊑1↑⟨⟩
+Obj ← {
+	kpar←(0⊑𝕨)∾0∾(1⊑𝕨)⋄
+	rpar←¯2↑𝕨
+	ohlc ← 𝕩
+	odata← ohlc∾˘>⊏˘>kpar LKF ¯1⊏˘ ohlc
+	pos← rpar XRun odata
+	#odata‿pos
+	⊑1↑⊑¯1‿¯1⊏pos
+}
+#0.001‿0.01‿10‿0.01 Obj lohlc
+########################################################
+### Genetic Algo
+#- Deals n numbers in interval with precision
+RDeal ← ((⊣•rand.Range ¯1⊸⊑)×((-´∘⌽2↑⊢)÷2⊸⊑))
+#10 RDeal ⟨0,10,100⟩
+#- Deals n elements from an array
+ADeal ← ((⊣ •rand.Range ≠∘⊢)⊏⊢)
+#40 ADeal 10×↕5
+#- Example deal multiple params
+#(5⊸RDeal)‿(7⊸ADeal) {𝕎𝕩}¨ ⟨0,10,100⟩‿(5+↕10)
+### Generates random parameters, Floating Point
+GenRan ←	<˘∘⍉∘>((⊣ •rand.Range (2⊸⊑⊢))×((2⊸⊑÷˜⟜(1⊸⊑-⊑))⊢))¨ 
+#3 GenRan ⟨1,1,1⟩‿⟨0,1,100⟩
+ #•Fmt  1.123412341234
+### Mutation
+Mutate ← {
+	r←1+•rand.Range ¯1+≠⊑𝕩
+	(r↑¨𝕩) ∾¨ r↓¨(•rand.Deal ≠𝕩) ⊏ 𝕩
+}
+Genetic ← {
+	pardefs ← 𝕩
+	niter‿ntop‿nper‿Obj‿opar ← 𝕨
+	#•Show opar
+#{𝕩 Obj opar}¨ 
+nper GenRan pardefs
+	(>{𝕩⋈𝕩 Obj opar}¨ nper GenRan pardefs) {
+		ntop ↑ ((⍒1⊸⊏˘)⊸⊏) 𝕩∾ >{𝕩⋈𝕩 Obj opar}¨  (⊏˘𝕩) (¬∘∊˜/⊢) (nper GenRan pardefs)∾(Mutate ⊏˘𝕩)
+		
+	}´ ↕niter
+ }
+#{"strat-params.csv" •FLines •Fmt¨ <˘𝕩⋄𝕩} 100‿20‿20‿Obj‿lohlc Genetic ⟨1,1,1⟩‿⟨0.001,0.001,1⟩‿⟨1,1,1⟩‿⟨0,2,100⟩
+{"strat-params.csv" •FLines •Repr¨  <˘𝕩⋄𝕩} "pars"‿"CumPnl"⊸∾ 100‿20‿50‿Obj‿lohlc Genetic ⟨0,0.002,100⟩‿⟨0,50,100⟩‿⟨0,0.2,100⟩‿⟨0,20,100⟩
+#pars←⟨0.9316,26.32,0,0.94⟩
+#pars Obj lohlc
+
+ObjS ← {
+	kpar←3↑𝕨⋄rpar←¯1⊑𝕨
+	odata← 𝕩∾˘>⊏˘>kpar LKF ¯1⊏˘ 𝕩
+	pos← rpar XRun odata
+	odata‿pos
+	#⊑1↑⊑¯1‿¯1⊏pos
+}
+#odata‿pos ← pars ObjS lohlc
+#⍉>pos
+#odata‿pos ← "1d"‿"SOL" Obj (<0.001‿0.01‿10)‿0.01
+#{st←𝕩.stats⋄FmtNs 𝕩.stats⋄
 #5 RSweep ⟨0.1,2.0⟩
-#pars← {𝕩‿0.01‿0.1}¨ 0.1‿0.01‿0.0001#10⋆2×↕3
-⋆(↕-(⌊÷⟜2)) 5
-pars← {0.0001‿0.01‿𝕩}¨ 7‿21‿50 #10×(↕-(⌊÷⟜2)) 3
-kfs← (ParLKF)¨ pars
-
-xs←pars (⋈¨) kfs
-⍉4↑odata←ohlc(∾)˘⍉>kfs
-pos‿isig‿osig‿pent←<˘⍉>(<0‿0‿0‿0){
-	in_pos‿sig_in‿sig_out‿p_in←𝕨
-	o‿h‿l‿c‿⟨k1,v1⟩‿⟨k2,v2⟩‿⟨k3,v3⟩←𝕩
-	#xin←(¬in_pos)∧ (0.0<k2-k3) ∧ (0.0<k1-k2)∧(l<k2)∧(o>k2)∧(c>k3) ∧ (0.05>k2-k3)
-	xin←(¬in_pos)∧ (v2>0.01) ∧ (v3>0.01) ∧(k1>k2)∧(k2>k3) 
-	xout←in_pos∧ ((k1<k2)∨(k2<k3)) #∨(¯0.1>c-p_in)) (0.3<c-k1)∨
-	#xout←in_pos∧ ((k1<k2)∨(c<k3)∨((o>k1)∧(c<k1)∧(0.4<c-p_in))) #∨(¯0.1>c-p_in)) (0.3<c-k1)∨
-	xin_pos←(xin∧¬in_pos)∨(in_pos∧¬xout)
-	xp_in←(xin×c)+(p_in×in_pos)
-	xin_pos‿xin‿xout‿(xp_in)
-}`<˘odata
-#+´¨pos‿isig‿osig
-ixin‿ixout←<˘(/isig) {𝕨≍𝕩∾((≠𝕨)>≠𝕩)⥊¯1+≠ohlc} /osig
-pin‿pout←<˘(>ixin‿ixout) ⊏ z
-
-#ww←≠ohlc⋄ws←200⋄we←ws+ww
-#ws←3500⋄we←4000⋄ww←we-ws
-ws←100⋄ww←(≠ohlc)-ws+1⋄we←ws+ww
+#pars← {1‿𝕩‿0.1}¨  ÷10×1+↕5
+#>kfs← { ⊑˘⊑˘> 𝕩 LKF ¯1⊏˘ lohlc}¨ pars
+#odata←lohlc
+#xs←pars (⋈¨) kfs
+#ws←0⋄we←(≠odata)⋄ww←we-ws
+ws←0⋄we←400⋄ww←we-ws
+wodata←ww↑ws↓odata
+#wixin‿wixout‿wpin‿wpout‿wpnl‿wcumpnl←ws‿ww WPOS pos
+wks← pars ⋈¨ {ww↑ws↓𝕩}¨ kfs
+#FmtNs XStats wpnl‿wcumpnl
 ixs← ws+↕ww
-¯3↑wodata←ww↑ws↓odata
-{(+´¬ixin≥ws)↓(-+´ixout>we)↓𝕩}
-wpmask←(ixout<we)∧(ixin>ws)
-(+´ixin<ws)
-(+´ixout>we)
-⍉>wixin‿wixout‿wpin‿wpout←{(+´¬ixin≥ws)↓(-+´ixout>we)↓𝕩}¨ ixin‿ixout‿pin‿pout
-wpnl←(¯0.002)+ -wpin-wpout
-wcumpnl←+`wpnl
-  ¯3↑˘wodata
-wk1‿wv1‿wk2‿wv2‿wk3‿wv3← <˘⍉∾˘ ¯3↑˘wodata
-wks←pars ⋈¨ wk1‿wk2‿wk3
-#wk1
- #50 Hist (>⟜0⊸/)wk1
+plt ← Gnuplot "
+	title 'Linear Kalman Filter' font ',18'
+	terminal wxt size 2300,900
+	y2tics nomirror tc lt 2
+	style line 5 lt rgb 'cyan' lw 5 pt 6"
+plt.Plot (ixs∾˘ 4↑˘wodata)‿"lw 1 with financebars title 'price'"
+#plt.Plot (((⊑wixin)‿0)∾wixout∾˘wcumpnl)‿"lc rgb 'red' lw 1.5 with lines axes x1y2"
+#plt.Plot (ixs∾˘4⊑˘wodata)‿"lw 2 with lines title 'K'"
+{p‿x←𝕩⋄s←"lw 2 with lines title '"∾(•Fmt p)∾"'"⋄plt.Plot (ixs∾˘x)‿s}¨wks
+#plt.Plot (⍉>wixin‿wpin)‿"with points pt 9 lw 6 lc rgb '#005500`'"
+#plt.Plot (⍉>wixout‿wpout)‿"with points pt 9 lw 6 lc rgb 'red'"
+"gnuplot-tmp-1.txt"•file.Chars plt.Debug @
+•SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
 
+
+#################################################
 #4↑˘wodata
 plt ← Gnuplot "
 	title 'Linear Kalman Filter' font ',18'
@@ -441,46 +514,6 @@ lc←¯1⊏˘lohlc
 
 
 
-
-
-
-
-
-#################################################################
-### Ichimoku Cloud 
-#################################################################
-Ichimoku ← {
-	con‿ban‿bn←𝕨⋄
-	col ← ÷⟜2 +´⌈‿⌊ {(0⥊˜con-1)∾𝕎 ˝˘ con↕𝕩}¨ ⋈˝⍉2‿3⊸⊏˘𝕩⋄
-	bal ← ÷⟜2 +´⌈‿⌊ {(0⥊˜ban-1)∾𝕎 ˝˘ ban↕𝕩}¨ ⋈˝⍉2‿3⊸⊏˘𝕩⋄
-	lesA ← (ban⥊0)» ÷⟜2 col + bal⋄
-	lesB ← (ban⥊0)» ÷⟜2 +´⌈‿⌊ {(0⥊˜bn-1)∾𝕎 ˝˘ bn↕𝕩}¨ ⋈˝⍉2‿3⊸⊏˘𝕩⋄
-	col‿bal‿lesA‿lesB
-}
-
-PlotIchimoku ← {
-	base‿quote←𝕨⋄
-	timeframe←𝕩⋄
-	
-	dcv ←500↑base‿quote LoadCandles timeframe⋄
-	cl←¯2⊏˘dcv⋄
-	col‿bal‿lesA‿lesB ← 30‿60‿120 Ichimoku dcv⋄
-	ixs ← ↕≠dcv⋄
-	plt ← Gnuplot "
-		title 'Ichimoku Cloud' font ',18'
-		terminal wxt size 1800,900
-		style line 5 lt rgb 'cyan' lw 3 pt 6"
-	plt.Plot (⍉>ixs‿lesA‿lesB)‿" with filledcurves fs solid 0.1"
-	plt.Plot (⍉>ixs‿cl)‿"lw 1 lc rgb 'black' with lines"
-	plt.Plot (⍉>ixs‿col)‿"lw 1 lc rgb '#5555CC' with lines"
-	plt.Plot (⍉>ixs‿bal)‿"lw 1 lc rgb 'red' with lines"
-	plt.Plot (⍉>ixs‿lesA)‿"lw 1 lc rgb 'gray' with lines"
-	plt.Plot (⍉>ixs‿lesB)‿"lw 1 lc rgb 'gray' with lines"
-	"gnuplot-ichimoku-1.txt" •file.Chars plt.Debug @
-	•SH "gnuplot"‿"-persist"‿"gnuplot-ichimoku-1.txt"
-}
-#"BTC"‿"USDT" PlotIchimoku "1d"
-###
 
 #################################################################
 ### Directional Change / ZigZag Algorithm 
