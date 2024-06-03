@@ -18,19 +18,18 @@ from time import sleep
 
 #%%
 
-def process_lppls(PAIR, TIMEFRAME, EXCHANGE):
-        
-    odf = pd.read_json(f'/media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data/{EXCHANGE}/{PAIR}-{TIMEFRAME}.json'
+def load_df(PAIR, TIMEFRAME, EXCHANGE):
+    return pd.read_json(f'/media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data/{EXCHANGE}/{PAIR}-{TIMEFRAME}.json'
     ).dropna().set_axis(['timestamp', 'open', 'high', 'low', 'close', 'volume'], axis=1
-    # ).assign(dtime=lambda x: pd.to_datetime(x['timestamp'], unit='ms', utc=False)
+    ).assign(dtime=lambda x: pd.to_datetime(x['timestamp'], unit='ms', utc=False)
     # ).drop('timestamp'
-    )#.set_index('dtime').sort_index()
+    ).set_index('dtime').sort_index()
 
-    """
-    Fit Model
-    Fit your data to the LPPL model
-    """
+#%%
+# load_df('BTC_USDT', '1w', 'binance')
 
+#%%
+def fit_lppls(odf):    
     dtime = pd.to_datetime(odf['timestamp'], unit='ms', utc=False)
     time = [pd.Timestamp.toordinal(d) for d in dtime]
     price = np.log(odf['close'].values)
@@ -52,13 +51,12 @@ def process_lppls(PAIR, TIMEFRAME, EXCHANGE):
     inner_increment=5, 
     max_searches=25
     )
-
-    """
-    Save Confidence Indicator
-    Run computations for lppl
-    """
-
     res_df = lppls_model.compute_indicators(res)
+    return [tc, m, w, a, b, c, c1, c2, O, D], lppls_model, res_df
+    
+#%%
+def process_lppls(tc, m, w, a, b, c, c1, c2, O, D, lppls_model, res_df):
+
     # res_df[['time', 'price', 'pos_conf', 'neg_conf']].to_csv(f"./res_df/{PAIR}-{TIMEFRAME}.png")
     res_df.to_csv(f"./res_df/{PAIR}-{TIMEFRAME}.csv")
 
@@ -125,23 +123,21 @@ def process_lppls(PAIR, TIMEFRAME, EXCHANGE):
 
 binance1d = ["1000SATS","1INCH","AAVE","ACA","ACE","ACH","ACM","ADA","ADX","AERGO","AEUR","AEVO","AGIX","AGLD","AI","AKRO","ALCX","ALGO","ALICE","ALPACA","ALPHA","ALPINE","ALT","AMB","AMP","ANKR","APE","API3","APT","ARB","ARDR","ARKM","ARK","ARPA","AR","ASR","ASTR","AST","ATA","ATM","ATOM","AUCTION","AUDIO","AVA","AVAX","AXL","AXS","BADGER","BAKE","BAL","BAND","BAR","BAT","BB","BCH","BEAMX","BEL","BETA","BICO","BIFI","BLUR","BLZ","BNB","BNT","BNX","BOME","BOND","BONK","BSW","BTC","BTTC","BURGER","C98","CAKE","CELO","CELR","CFX","CHESS","CHR","CHZ","CITY","CKB","CLV","COMBO","COMP","COS","COTI","CREAM","CRV","CTK","CTSI","CTXC","CVC","CVP","CVX","CYBER","DAR","DASH","DATA","DCR","DEGO","DENT","DEXE","DF","DGB","DIA","DOCK","DODO","DOGE","DOT","DUSK","DYDX","DYM","EDU","EGLD","ELF","ENA","ENJ","ENS","EOS","EPX","ERN","ETC","ETHFI","ETH","EUR","FARM","FDUSD","FET","FIDA","FIL","FIO","FIRO","FIS","FLM","FLOKI","FLOW","FLUX","FORTH","FOR","FRONT","FTM","FTT","FUN","FXS","GALA","GAL","GAS","GFT","GHST","GLMR","GLM","GMT","GMX","GNO","GNS","GRT","GTC","HARD","HBAR","HFT","HIFI","HIGH","HIVE","HOOK","HOT","ICP","ICX","IDEX","ID","ILV","IMX","INJ","IOST","IOTA","IOTX","IQ","IRIS","JASMY","JOE","JST","JTO","JUP","JUV","KAVA","KDA","KEY","KLAY","KMD","KNC","KP3R","KSM","LAZIO","LDO","LEVER","LINA","LINK","LIT","LOKA","LOOM","LPT","LQTY","LRC","LSK","LTC","LTO","LUNA","LUNC","MAGIC","MANA","MANTA","MASK","MATIC","MAV","MBL","MBOX","MDT","MDX","MEME","METIS","MINA","MKR","MLN","MOVR","MTL","NEAR","NEO","NEXO","NFP","NKN","NMR","NOT","NTRN","NULS","OAX","OCEAN","OGN","OG","OMG","OMNI","OM","ONE","ONG","ONT","OOKI","OP","ORDI","ORN","OSMO","OXT","PAXG","PDA","PENDLE","PEOPLE","PEPE","PERP","PHA","PHB","PIVX","PIXEL","POLS","POLYX","POND","PORTAL","PORTO","POWR","PROM","PROS","PSG","PUNDIX","PYR","PYTH","QI","QKC","QNT","QTUM","QUICK","RAD","RARE","RAY","RDNT","REEF","REI","REN","REQ","REZ","RIF","RLC","RNDR","RONIN","ROSE","RPL","RSR","RUNE","RVN","SAGA","SAND","SANTOS","SCRT","SC","SEI","SFP","SHIB","SKL","SLP","SNT","SNX","SOL","SPELL","SSV","STEEM","STG","STMX","STORJ","STPT","STRAX","STRK","STX","SUI","SUN","SUPER","SUSHI","SXP","SYN","SYS","TAO","TFUEL","THETA","TIA","TKO","TLM","TNSR","TRB","TROY","TRU","TRX","T","TUSD","TWT","UFT","UMA","UNFI","UNI","USDC","USDP","USTC","UTK","VANRY","VET","VGX","VIB","VIC","VIDT","VITE","VOXEL","VTHO","WAN","WAVES","WAXP","WBETH","WBTC","WIF","WING","WIN","WLD","WNXM","WOO","WRX","W","XAI","XEC","XEM","XLM","XNO","XRP","XTZ","XVG","XVS","YFI","YGG","ZEC","ZEN","ZIL","ZRX"]
 
+#%%
+
 # %%
 
-TIMEFRAMES = ['1w', '8h', '4h']
+TIMEFRAMES = ['1d', '1w', '8h', '4h', '2h']
 EXCHANGE = 'binance'
-for ASSET in tqdm(binance1d):
+for ASSET in tqdm(binance1d[binance1d.index('BONK'):]):
     for TIMEFRAME in TIMEFRAMES:
         PAIR = f'{ASSET}_USDT'
-        print(PAIR)
-        process_lppls(PAIR, TIMEFRAME, EXCHANGE)
+        print(f'{PAIR}-{TIMEFRAME}')
+        odf = load_df(PAIR, TIMEFRAME, EXCHANGE).tail(1024)
+        [tc, m, w, a, b, c, c1, c2, O, D], lppls_model, res_df = fit_lppls(odf)
+        process_lppls(tc, m, w, a, b, c, c1, c2, O, D, lppls_model, res_df)
     
 # %%
 
-TIMEFRAMES = ['1w', '8h', '4h']
-EXCHANGE = 'binance'
-for ASSET in tqdm(binance1d):
-    for TIMEFRAME in TIMEFRAMES:
-        PAIR = f'{ASSET}_USDT'
-        print(PAIR)
-        process_lppls(PAIR, TIMEFRAME, EXCHANGE)
+
 # %%

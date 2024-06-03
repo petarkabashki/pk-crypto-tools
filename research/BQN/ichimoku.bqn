@@ -8,7 +8,8 @@ str←•Import "bqn-libs/strings.bqn"
 #1‿1 MP 2‿2⥊4
 ⟨FmtNs, GLine, WMean, Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist⟩←•Import "pk-libs.bqn"
 
-
+Test ← {fn←{Cond‿Act 𝕊 else: Cond◶Else‿Act}´𝕩 ⋄ Fn@}
+IfElse ← {cond‿True‿False: cond◶False‿True @}
 NFmt ← ⟨"¯"⟩‿⟨"-"⟩⊸str.ReplaceAll ∘ •Fmt
 TFmt ← {r←𝕩⋄⍉>𝕨 {𝕎¨ 𝕩⊏˘r}¨ (↕≠𝕨)}
 jsondir← "/media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data/binance/"
@@ -47,7 +48,16 @@ XIndicators ← {
 #(wfra > 0 ) / 3↑˘klines
 #20‿60‿120‿30 XIndicators lohlcv ←  LdJson "AVAX"‿"USDT"‿"8h" 
 
-XStra ← { 
+#⟨klines, indicators⟩ ← {klines⇐𝕩⋄indicators ⇐ (20‿60‿120‿30⊸XIndicators 𝕩)} LdJson "ETH"‿"USDT"‿"1d"
+#indicators
+#
+#3↑ klines
+
+#tenkan‿kijun‿senkoua‿senkoub‿wfra ← indicators
+#<˘120↓ klines∾˘tenkan∾˘kijun∾˘senkoua∾˘senkoub∾˘wfra
+
+
+XStra2 ← { 
 	skipN ← 𝕨
 	⟨klines,indicators⟩ ← 𝕩
 	⟨tenkan,kijun,senkouA,senkouB⟩ ← indicators
@@ -55,6 +65,7 @@ XStra ← {
 	senkouUp‿senkouDn ← ⌈‿⌊ {𝕎 ´ 𝕩}¨ < senkouA‿senkouB
 	close←¯2⊏˘klines⋄ # lnclose ← ⋆⁼ close
 	xinsig ⇐ (skipN < ixs) ∧ (tenkan > kijun) ∧ (close > senkouUp) ∧ (close > tenkan)
+#	xoutsig ←  (close < senkouUp)   #∨ (tenkan < kijun)
 	xenter ⇐ (⊢∧(¬»)) xinsig
 
 	xexit ←  (close < senkouUp)   #∨ (tenkan < kijun)
@@ -68,10 +79,12 @@ XStra ← {
 }
 
 XStats ⇐ {
-		⟨pnl,cumpnl⟩ ← 𝕩
+		⟨inpos,pnl,cumpnl⟩ ← 𝕩
+		xin ← /posin ← ((¬»)∧⊢) inpos
+		xout ← /posout ← (»∧¬) inpos
 		ret⇐¯1⊑0∾cumpnl
-		ntrades⇐≠pnl⋄nwins⇐+´pnl>0⋄nlosses⇐ntrades-nwins⋄winratio⇐nwins÷ntrades⋄
-		wins←(0⊸<⊸/)pnl⋄losses←(0⊸≥⊸/)pnl⋄avgwin⇐(+´÷≠)wins⋄avgloss⇐(+´÷≠)losses⋄
+		ntrades⇐≠xout⋄nwins⇐+´0<xout⊏pnl⋄nlosses⇐ntrades-nwins⋄winratio⇐nwins÷ntrades⋄
+		wins←(0⊸<⊸/)xout⊏pnl⋄losses←(0⊸≥⊸/)xout⊏pnl⋄avgwin⇐(+´÷≠)wins⋄avgloss⇐(+´÷≠)losses⋄
 		bottompnl⇐⌊´cumpnl
 		maxpnl←⌈`cumpnl
 		ddn←-maxpnl-cumpnl
@@ -83,22 +96,51 @@ XStats ⇐ {
  	#•Show cumpnl
 	#XRun ⇐ {XStats XPositions XExits XEntries 𝕨 XIndicators Xload 𝕩}
 }
+#klines ← LdJson "BTC"‿"USDT"‿"1d"
+#indicators ⇐ 20‿60‿120‿30⊸XIndicators klines 
+#skipN←120
+XStra ← { 
+	skipN ← 𝕨
+	⟨klines,indicators⟩ ← 𝕩
+	⟨tenkan,kijun,senkouA,senkouB,wfra⟩ ← indicators
+	entprice←0
 
-#{"[0:100] " ∾ (NFmt 𝕩)∾",t lw 1 lc rgb 'black' axes x1y1"}¨ ↕5
-#≍⟨⟩
+	inpos‿pnl ⇐ <˘⍉ (skipN‿2⥊0) ∾ > (<0‿0) {𝕤
+		inpos‿pnl ← 𝕨 ⋄ ts‿open‿high‿low‿close‿vlume‿tenkan‿kijun‿senkoua‿senkoub‿wfra ← 𝕩
+		{
+			((¬inpos) ∧ (tenkan>kijun) ∧ (close > senkoua) ∧ (close > senkoub) ∧ (senkoua < senkoub)) ? ({𝕤
+					#inpos↩1 ⋄ 
+					entprice↩close ⋄ #⋄ pnl↩0 ⋄
+					#•Show "Enter entprice: "∾(Nfmt entprice)∾"  price: "∾ (NFmt close)∾"  pnl: "∾(NFmt pnl)
+					#•Show "Entering..."
+					1‿0
+			}@);
+			(inpos ∧ (close < senkoua⌈senkoub)) ? ({𝕤
+					#inpos↩0 #⋄ pnl↩ ⋆⁼ close ÷ entprice⋄ 					
+					#•Show "Exit entprice: "∾(Nfmt entprice)∾"  price: "∾ (NFmt close)∾"  pnl: "∾(NFmt pnl)
+					#entprice↩0
+					0‿(⋆⁼ close÷entprice)
+			}@);
+			{𝕤⋄inpos‿0}@
+		}
+	}` <˘ skipN↓ ⊢ klines∾˘tenkan∾˘kijun∾˘senkoua∾˘senkoub∾˘wfra
+	cumpnl ⇐ +` pnl
+}
 		
-⟨klines,indicators,res⟩←{⟨klines,indicators⟩⇐𝕩⋄res⇐120⊸XStra 𝕩} {klines⇐𝕩⋄indicators ⇐ (20‿60‿120‿30⊸XIndicators 𝕩)} LdJson "ETH"‿"USDT"‿"1d"
-ws‿pwl ← 500‿200
+#⟨klines,indicators,res⟩←{⟨klines,indicators⟩⇐𝕩⋄res⇐120⊸XStra 𝕩} {klines⇐𝕩⋄indicators ⇐ (20‿60‿120‿30⊸XIndicators 𝕩)} LdJson "ADA"‿"USDT"‿"1d"
+
+ws‿pwl ← 0‿∞
 #wl← pwl⌊ (≠klines) - ws
 #Ww←(wl⊸↑ws⊸↓) ⋄ Wi ← (({∧´ (≥⟜ws)‿((ws+wl)⊸≥) {𝕎 𝕩}¨ 𝕩} (<⊑˘))⊸/)
-#PlotSingle ← { 𝕤
-#	⟨klines,indicators,res⟩← 𝕩⋄ 	ws‿pwl ← 𝕨⋄
+PlotSingle ← { 𝕤
+	⟨klines,indicators,res⟩← 𝕩⋄ 	ws‿pwl ← 𝕨⋄
 	⟨tenkan,kijun,senkoua,senkoub,wfra⟩ ← indicators
-	#(0⊏res.xio)≍(0⊏res.cio)
 	ts‿open‿high‿low‿close‿volume ←<˘⍉ klines
 	wl← pwl⌊ (≠klines) - ws
 	Ww←(wl⊸↑ws⊸↓) ⋄ Wi ← (({∧´ (≥⟜ws)‿((ws+wl)⊸≥) {𝕎 𝕩}¨ 𝕩} (<⊑˘))⊸/)
-	posCloud ← senkouA > senkouB
+	⟨inpos,pnl⟩ ← res
+	xin ← /posin ← ((¬»)∧⊢) res.inpos
+	xout ← /posout ← (»∧¬) res.inpos
 	ymin ← ⌊´Ww low⋄ymax← ⌈´Ww high
 	#close←¯2⊏˘klines⋄ # lnclose ← ⋆⁼ close
 		ixs ← ↕≠klines⋄
@@ -106,15 +148,13 @@ ws‿pwl ← 500‿200
 			title 'Ichimoku Cloud' font ',18'
 			terminal wxt size 2400,900
 			y2tics 0.20 nomirror tc lt 2
+			y2range [-1:10]
 			xrange ["∾(NFmt ws)∾":"∾(NFmt ws+wl-1)∾"]
 			yrange ["∾(NFmt ymin)∾":"∾(NFmt ymax)∾"]
-			y2range [-1:10]
 			grid
 			parametric
 			style line 5 lt rgb 'cyan' lw 3 pt 6"
 		plt.Plot (Ww ⍉>ixs‿senkouA‿senkouB)‿" with filledcurves fs solid 0.1"
-		#plt.Plot (Wi (posCloud/⍉>ixs‿senkouA‿senkouB))‿"lc rgb 'green' with filledcurves fs solid 0.1"
-		#plt.Plot (Wi ((¬posCloud)/⍉>ixs‿senkouA‿senkouB))‿"lc rgb 'red' with filledcurves fs solid 0.1"
 		plt.Plot (Ww ⍉>ixs‿close)‿"lw 2 lc rgb 'black' with lines"
 #		#plt.Plot (⍉>ixs‿high)‿"lw 1 lc rgb 'orange' with lines"
 #		#plt.Plot (⍉>ixs‿low)‿"lw 1 lc rgb 'green' with lines"
@@ -122,13 +162,16 @@ ws‿pwl ← 500‿200
 		plt.Plot (Ww ⍉>ixs‿kijun)‿"lw 1 lc rgb 'red' with lines"
 		plt.Plot (Ww ⍉>ixs‿senkouA)‿"lw 1 lc rgb 'gray' with lines"
 		plt.Plot (Ww ⍉>ixs‿senkouB)‿"lw 1 lc rgb 'gray' with lines"
-		plt.Plot (Wi ⍉>res.posoutx‿res.cumpnl)‿"lw 5 lc rgb 'orange' with steps axes x1y2"
-		plt.Plot (Wi ⍉ (0⊏res.xio)≍(0⊏res.cio))‿"lw 5 lc rgb 'black' with points"
-		plt.Plot (Wi (0<res.pnl)/ ⍉(1⊏res.xio)≍(1⊏res.cio))‿"lw 4 lc rgb 'green' with points"
-		plt.Plot (Wi (0≥res.pnl)/ ⍉(1⊏res.xio)≍(1⊏res.cio))‿"lw 4 lc rgb 'red' with points"
-		{plt.Plot "" ∾ (NFmt 𝕩)∾",t lw 2 lc rgb 'black' axes x1y1"}¨ (Wi (0⊏res.xio))
-		{plt.Plot (NFmt 𝕩)∾",t lw 2 lc rgb 'green'"}¨ Wi (0<res.pnl)/ ⍉(1⊏res.xio)≍(1⊏res.cio)
-		{plt.Plot (NFmt 𝕩)∾",t lw 2 lc rgb 'red'"}¨ (Wi (0≥res.pnl)/ ⍉(1⊏res.xio)≍(1⊏res.cio))
+		plt.Plot (Wi ⍉>ixs‿res.cumpnl)‿"lw 5 lc rgb 'orange' with steps axes x1y2"
+		plt.Plot ((xin)(⊣∾˘⊏)close)‿"lw 5 lc rgb 'black' with points"
+		plt.Plot ((xout)(⊣∾˘⊏)close)‿"lw 5 lc rgb 'blue' with points"
+#		plt.Plot (Wi ⍉>res.posoutx‿res.cumpnl)‿"lw 5 lc rgb 'orange' with steps axes x1y2"
+#		plt.Plot (Wi ⍉ (0⊏res.xio)≍(0⊏res.cio))‿"lw 5 lc rgb 'black' with points"
+#		plt.Plot (Wi (0<res.pnl)/ ⍉(1⊏res.xio)≍(1⊏res.cio))‿"lw 4 lc rgb 'green' with points"
+#		plt.Plot (Wi (0≥res.pnl)/ ⍉(1⊏res.xio)≍(1⊏res.cio))‿"lw 4 lc rgb 'red' with points"
+#		{plt.Plot "" ∾ (NFmt 𝕩)∾",t lw 2 lc rgb 'black' axes x1y1"}¨ (Wi (0⊏res.xio))
+#		{plt.Plot (NFmt 𝕩)∾",t lw 2 lc rgb 'green'"}¨ Wi (0<res.pnl)/ ⍉(1⊏res.xio)≍(1⊏res.cio)
+#		{plt.Plot (NFmt 𝕩)∾",t lw 2 lc rgb 'red'"}¨ (Wi (0≥res.pnl)/ ⍉(1⊏res.xio)≍(1⊏res.cio))
 #		plt.Plot (Wi (0<wfra)/(⍉>ixs‿high))‿"lw 3 lc rgb 'gray' with points"
 #		plt.Plot (Wi (0>wfra)/(⍉>ixs‿low))‿"lw 3 lc rgb 'gray' with points"
 		#plt.Plot ((0≥wfra)/ ⍉(1⊏res.xio)≍(1⊏res.cio))‿"lw 4 lc rgb 'red' with points"
@@ -136,7 +179,7 @@ ws‿pwl ← 500‿200
 		"gnuplot-ichimoku-1.txt" •file.Chars plt.Debug @
 		•SH "gnuplot"‿"-persist"‿"gnuplot-ichimoku-1.txt"
 }
-1000‿700 PlotSingle {⟨klines,indicators⟩⇐𝕩⋄res⇐120⊸XStra 𝕩} {klines⇐𝕩⋄indicators ⇐ (20‿60‿120‿30⊸XIndicators 𝕩)} LdJson "ADA"‿"USDT"‿"1d"
+#0‿∞ PlotSingle {⟨klines,indicators⟩⇐𝕩⋄res⇐120⊸XStra 𝕩} {klines⇐𝕩⋄indicators ⇐ (20‿60‿120‿30⊸XIndicators 𝕩)} LdJson "DOT"‿"USDT"‿"8h"
 
 
 ########################################
@@ -167,10 +210,10 @@ BTest100 ← { 𝕤
 	stats ← XStats¨ res
 	((<"")∾assets) ∾˘((0⊸⊏˘⊑)∾(>(1⊸⊏˘)¨)) {k←•ns.Keys 𝕩⋄ k≍˘𝕩⊸•ns.Get¨ k}¨ stats
 }
-#tfr ← "4h"
-#tres ← tfr BTest100 binance1d
+tfr ← "1d"
+tres ← tfr BTest100 binance1d
 
-#("binance-"∾tfr∾"-Ichimoku.csv") •FLines csv.JoinL ((0⊸⊏)∾(⊢‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt⊸TFmt 1⊸↓))tres
+("binance-"∾tfr∾"-Ichimoku.csv") •FLines csv.JoinL ((0⊸⊏)∾(⊢‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt⊸TFmt 1⊸↓))tres
 #1↓ tres
 
 #+´¯1⊑˘tres
