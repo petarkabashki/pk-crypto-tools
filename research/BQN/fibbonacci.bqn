@@ -36,7 +36,7 @@ LdJson ←{
 IfElse ← {cond‿True‿False: cond◶False‿True @}
 TestConds ← {fn←{Cond‿Act 𝕊 else: Cond◶Else‿Act}´𝕩 ⋄ Fn@}
 
-ohlc← "1d" LdJson "BTC"‿"USDT"
+ohlc← ¯1000↑ "4h" LdJson "BTC"‿"USDT"
 cl← ⋆⁼ ¯2⊸⊏˘ ohlc
 Peaks ← {
 	qdc←𝕨⋄
@@ -51,7 +51,7 @@ Peaks ← {
 		(ix+1)∾nacc
 	}´ ⌽𝕩⋄
 }
-pks ← 0.20 Peaks cl 
+pks ← 0.10 Peaks cl 
 pix←0⊑˘pks
 pcpix←pix⊸⊏cl
 0.15>|-˝pcpix≍»pcpix
@@ -66,3 +66,4 @@ plt.Plot (⍉>ixs‿cl)‿"lw 1 lc rgb 'black' with lines"
 •SH "gnuplot"‿"-persist"‿"gnuplot-zigzag-1.txt"
 18541.28 ÷ 18325.11 -1 
 
+0
