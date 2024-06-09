@@ -15,21 +15,12 @@ IfElse ← {cond‿True‿False: cond◶False‿True @}
 NFmt ← ⟨"¯"⟩‿⟨"-"⟩⊸str.ReplaceAll ∘ •Fmt
 TFmt ← {r←𝕩⋄⍉>𝕨 {𝕎¨ 𝕩⊏˘r}¨ (↕≠𝕨)}
 binanceDir← "/media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data/binance/"
-FName ← {(⊑𝕩)∾"_"∾(1⊑𝕩)∾"-"∾(2⊑𝕩)∾".json"}
-#FName "BTC"‿"USDT"‿"8h"
-#LdJson ←{ 
-#	>JParse •FChars 𝕩
-#}
-#LdJsLc ← {⋆⁼ ¯2⊏˘ 𝕨 LdJson 𝕩‿"USDT"}
 Qcsv ← (⊣•FLines⟜(csv.JoinL NFmt¨)) 
-
-#3↑ lohlcv ← (⊑˘ ∾˘ (⋆⁼1‿2‿3‿4⊸⊏˘)) LdJson "AVAX"‿"USDT"‿"8h" 
-#10↑ 2‿3⊸⊏˘ ohlcv
-#10↑ klines ← LdJson (<⊸∾⟜("USDT"‿"1d")) "ETH"
-#10↑¨ ((((««)∾˘») (0‿0∾2⊸↕) ))¨ 2‿3 ⊏˘¨ <klines 
-#h‿l ← 2‿3 ⊏˘¨ <klines 
-#10↑ ∾˘´ c5h‿c5l ← ⌈‿⌊ { 𝕎 ´˘ 𝕩 }¨ ((((««)∾˘») (0‿0∾2⊸↕) ))¨ h‿l
-
+FName ← {t‿q‿b←𝕨∾<𝕩⋄binanceDir∾b∾"_"∾q∾"-"∾t∾".json"}
+KNorm ← ((1⊸↑˘)∾˘(⋆⁼1⊸↓˘))
+LgLoad ← {KNorm ¯1↓˘>JParse •FChars 𝕨‿"USDT" FName 𝕩}
+"8h" LgLoad "ADA"
+#5↑ ((1⊸↑˘)∾˘(⋆⁼1⊸↓˘)) ¯1↓˘ >JParse •FChars binanceDir ∾ "BTC_USDT-1d.json"
 
 #################################################################
 ### Ichimoku Cloud 
@@ -75,10 +66,11 @@ XStra2 ← {
 
 XStra ← {𝕤
 	⟨klines,indicators,iparams⟩ ⇐ 𝕩
+# ⟨klines,indicators,iparams⟩ ← {tenkanN⇐20⋄kijunN⇐60⋄senkBN⇐120⋄cloudN⇐30}⊸XIndicators {klines⇐𝕩} "8h" LgLoad "ADA"
 #	⟨klines,indicators,iparams⟩ ← {tenkanN⇐20⋄kijunN⇐60⋄senkBN⇐120⋄cloudN⇐30} XIndicators {klines⇐LdJson "ADA"‿"USDT"‿"1d"}
 	⟨tenkan,kijun,senkouA,senkouB,wfl⟩ ← indicators
-	lows ← 3⊑˘klines
-	ts‿open‿high‿low‿close‿vlume ← <˘⍉klines
+	ts‿open‿high‿low‿close ← <˘⍉klines
+klines	
 	iwfl←/wfl
 	lwfrT ← (∾˘⟜(⊏⟜low)) iwfl
 	dwfl←(-⟜»)/wfl∾1⋄
@@ -104,9 +96,10 @@ XStra ← {𝕤
 #									{𝕤⋄inpos‿0}@
 #							}@)
 							(inpos) ? ({𝕤
-									(exitsig∨(0∧(close>entprice)∧(close<sl))) ? ({𝕤
+									#(exitsig∨(0∧(close>entprice)∧(close<sl))) ? ({𝕤
+									(exitsig) ? ({𝕤
 											 #inpos↩0 #⋄ pnl↩ ⋆⁼ close ÷ entprice⋄                                   
-											 pnl ← (⋆⁼ close÷entprice)
+											 pnl ← (close-entprice)
 											 nex↩0⋄
 											 #•Show "Exit entprice: "∾(Nfmt entprice)∾"  price: "∾ (NFmt close)∾"  pnl: "∾(NFmt pnl)
 											 #entprice↩0
@@ -133,15 +126,9 @@ XStra ← {𝕤
 PlotSingle ← { 𝕤
 	⟨klines,indicators,res⟩← 𝕩⋄ 	ws‿pwl ← 𝕨⋄
 	⟨tenkan,kijun,senkoua,senkoub,wfl,wfh⟩ ← indicators
-	ts‿open‿high‿low‿close‿volume ←<˘⍉ klines
+	ts‿open‿high‿low‿close ←<˘⍉ klines
 	wl← pwl⌊ (≠klines) - ws
 	Ww←(wl⊸↑ws⊸↓) ⋄ Wi ← (({∧´ (≥⟜ws)‿((ws+wl)⊸≥) {𝕎 𝕩}¨ 𝕩} (<⊑˘))⊸/)
-
-	iwfl←/wfl
-	lwfrT ← (∾˘⟜(⊏⟜low)) iwfl
-	dwfl←(-⟜»)/wfl∾1⋄
-	wfrlow← ((dwfl)/(0∾iwfl))⊏low
-
 
 	xin ← /posin ← ((¬»)∧⊢) res.inpos
 	xout ← /posout ← (»∧¬) res.inpos
@@ -167,15 +154,14 @@ PlotSingle ← { 𝕤
 		plt.Plot (Ww ⍉>ixs‿senkouA)‿"lw 1 lc rgb 'gray' with lines"
 		plt.Plot (Ww ⍉>ixs‿senkouB)‿"lw 1 lc rgb 'gray' with lines"
 		plt.Plot (Wi ⍉>ixs‿res.cumpnl)‿"lw 5 lc rgb 'orange' with steps axes x1y2"
-		plt.Plot (Wi lwfrT)‿"lw 5 lc rgb 'gray' with points"
+		#plt.Plot (Wi lwfrT)‿"lw 5 lc rgb 'gray' with points"
 		#plt.Plot (Ww ⍉>ixs‿wfrlow)‿"lw 1 lc rgb 'black' with lines"
 		plt.Plot ((xin)(⊣∾˘⊏)close)‿"lw 5 lc rgb 'black' with points"
 		plt.Plot ((xout)(⊣∾˘⊏)close)‿"lw 5 lc rgb 'blue' with points"
 		"gnuplot-ichimoku-1.txt" •file.Chars plt.Debug @
 		•SH "gnuplot"‿"-persist"‿"gnuplot-ichimoku-1.txt"
 }
-
-#0‿∞ PlotSingle XStra {tenkanN⇐15⋄kijunN⇐60⋄senkBN⇐80⋄cloudN⇐30}⊸XIndicators {klines⇐𝕩}LdJson "REN"‿"USDT"‿"8h"
+#0‿∞ PlotSingle XStra {tenkanN⇐30⋄kijunN⇐60⋄senkBN⇐120⋄cloudN⇐30}⊸XIndicators {klines⇐𝕩} "8h" LgLoad "ALGO"
 
 XStats ⇐ {
 		⟨inpos,pnl,cumpnl⟩ ← 𝕩
@@ -199,32 +185,31 @@ XStats ⇐ {
 (≠⊸∾) binance1d ← •FLines "/media/mu6mula/Data/Crypto-Data-Feed/binance-1d.csv"
 
 
-tframe ← "1d"
-SaveStatsRep ← {("binance-"∾tframe∾"-Ichimoku.csv") •FLines csv.JoinL ((0⊸⊏)∾(⊢‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt⊸TFmt 1⊸↓)) 𝕩}
-#XStatsRep ← 
-#"8h" { 𝕤
-#	tfr ← 𝕨
-#	assets ← 𝕩
-SaveStatsRep rep ⇐ ((<"")∾assets) ∾˘((0⊸⊏˘⊑)∾(>(1⊸⊏˘)¨)) {k←•ns.Keys 𝕩⋄ k≍˘𝕩⊸•ns.Get¨ k}¨ stats ← XStats¨ •ns.Get⟜"res"¨ restra← XStra¨ {tenkanN⇐20⋄kijunN⇐60⋄senkBN⇐120⋄cloudN⇐30}⊸XIndicators¨{klines⇐𝕩}¨ ⊑ klines‿assets‿fileNames /˜¨↩ <nrowsFilter← 200⊸< ≠¨ klines ← (> JParse⟜•FChars)¨ 1⊸⊑ assets‿fileNames /˜¨↩<filterFX←•file.Exists¨ fileNames←binanceDir⊸∾¨ Fname¨ tframe⊸{𝕩‿"USDT"‿𝕨}¨ assets←top100
+tframe ← "8h"
+SaveStatsRep ← {tframe←𝕨⋄("binance-"∾tframe∾"-Ichimoku.csv") •FLines csv.JoinL ((0⊸⊏)∾(⊢‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt⊸TFmt 1⊸↓)) 𝕩}
+########################################
+### Generate report on top100 coins
+#tframe SaveStatsRep rep ⇐ ((<"")∾assets) ∾˘((0⊸⊏˘⊑)∾(>(1⊸⊏˘)¨)) {k←•ns.Keys 𝕩⋄ k≍˘𝕩⊸•ns.Get¨ k}¨ stats ← XStats¨ •ns.Get⟜"res"¨ restra← XStra¨ {tenkanN⇐20⋄kijunN⇐60⋄senkBN⇐120⋄cloudN⇐30}⊸XIndicators¨{klines⇐𝕩}¨ ⊑ klines‿assets‿fileNames /˜¨↩ <nrowsFilter← 200⊸< ≠¨ klines ← (KNorm ((¯1⊸↓˘>)JParse⟜•FChars))¨ 1⊸⊑ assets‿fileNames /˜¨↩<filterFX←•file.Exists¨ fileNames←binanceDir⊸∾¨ Fname¨ tframe⊸{𝕩‿"USDT"‿𝕨}¨ assets←top100
 
 
-  #res← ({𝕩.res} XStra⟜({tenkanN⇐20⋄kijunN⇐60⋄senkBN⇐120⋄cloudN⇐30}⊸XIndicators  {•Show𝕩⋄klines⇐LdJson 𝕩‿"USDT"‿tfr}))¨ assets
+########################################
+### Optimize single asset params via Genetic Algo and Grid Search
 
- #{klines⇐𝕩⋄indicators ⇐ (20‿60‿120‿30⊸XIndicators 𝕩)}¨ klines
-	#stats ⇐ XStats¨ res
-	#rep ⇐ ((<"")∾assets) ∾˘((0⊸⊏˘⊑)∾(>(1⊸⊏˘)¨)) {k←•ns.Keys 𝕩⋄ k≍˘𝕩⊸•ns.Get¨ k}¨ stats
-𝕨 {𝕩‿"USDT"‿𝕨}¨ 𝕩 
-} binance1d
-"8h" XStatsRep binance1d
+#0‿∞ PlotSingle XStra {tenkanN⇐30⋄kijunN⇐60⋄senkBN⇐120⋄cloudN⇐30}⊸XIndicators {klines⇐𝕩} "8h" LgLoad "ALGO"
 
-"4h" (⊣ SaveStatsRep XStatsRep) binance1d
-Obj ← {+´ 1⊑˘ 1↓ "1d" XStatsRep binance1d
+Mutate ⇐ {
+	r←1+•rand.Range ¯1+≠⊑𝕩
+	(r↑¨𝕩) ∾¨ r↓¨(•rand.Deal ≠𝕩) ⊏ 𝕩
+}
+Genetic ⇐ {
+	pardefs ← 𝕩
+	niter‿ntop‿nper‿Obj‿opar ← 𝕨
+	#•Show opar
+#{𝕩 Obj opar}¨ 
+nper GenRan pardefs
+	(>{𝕩⋈𝕩 Obj opar}¨ nper GenRan pardefs) {
+		ntop ↑ ((⍒1⊸⊏˘)⊸⊏) 𝕩∾ >{𝕩⋈𝕩 Obj opar}¨  (⊏˘𝕩) (¬∘∊˜/⊢) (nper GenRan pardefs)∾(Mutate ⊏˘𝕩)
+		
+	}´ ↕niter
+ }
 
-#1↓ tres
-
-#+´¯1⊑˘tres
-#"top100-Ichimoku.csv" •FLines csv.JoinL ("ASSET"‿"PNL")∾  ⊢‿NFmt TFmt tres 
-#tres
-
-#"BTC"‿"USDT" PlotIchimoku "1d"
-###
