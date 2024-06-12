@@ -161,7 +161,7 @@ PlotSingle ← { 𝕤
 		"gnuplot-ichimoku-1.txt" •file.Chars plt.Debug @
 		•SH "gnuplot"‿"-persist"‿"gnuplot-ichimoku-1.txt"
 }
-0‿∞ PlotSingle XStra {tenkanN⇐30⋄kijunN⇐45⋄senkBN⇐45⋄cloudN⇐60}⊸XIndicators {klines⇐𝕩} "8h" LgLoad "ALGO"
+#0‿∞ PlotSingle XStra {tenkanN⇐30⋄kijunN⇐45⋄senkBN⇐45⋄cloudN⇐60}⊸XIndicators {klines⇐𝕩} "8h" LgLoad "ALGO"
 
 XStats ⇐ {
 		⟨inpos,pnl,cumpnl⟩ ← 𝕩
@@ -189,16 +189,17 @@ tframe ← "8h"
 SaveStatsRep ← {tframe←𝕨⋄("binance-"∾tframe∾"-Ichimoku.csv") •FLines csv.JoinL ((0⊸⊏)∾(⊢‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt⊸TFmt 1⊸↓)) 𝕩}
 ########################################
 ### Generate report on top100 coins
-#tframe SaveStatsRep rep ⇐ ((<"")∾assets) ∾˘((0⊸⊏˘⊑)∾(>(1⊸⊏˘)¨)) {k←•ns.Keys 𝕩⋄ k≍˘𝕩⊸•ns.Get¨ k}¨ stats ← XStats¨ •ns.Get⟜"res"¨ restra← XStra¨ {tenkanN⇐20⋄kijunN⇐60⋄senkBN⇐120⋄cloudN⇐30}⊸XIndicators¨{klines⇐𝕩}¨ ⊑ klines‿assets‿fileNames /˜¨↩ <nrowsFilter← 200⊸< ≠¨ klines ← (KNorm ((¯1⊸↓˘>)JParse⟜•FChars))¨ 1⊸⊑ assets‿fileNames /˜¨↩<filterFX←•file.Exists¨ fileNames←binanceDir⊸∾¨ Fname¨ tframe⊸{𝕩‿"USDT"‿𝕨}¨ assets←top100
-
+{𝕤
+	•Show tframe SaveStatsRep rep ⇐ ((<"")∾assets) ∾˘((0⊸⊏˘⊑)∾(>(1⊸⊏˘)¨)) {k←•ns.Keys 𝕩⋄ k≍˘𝕩⊸•ns.Get¨ k}¨ stats ← XStats¨ •ns.Get⟜"res"¨ restra← XStra¨({tenkanN‿kijunN‿senkBN‿cloudN⇐𝕩}60‿80‿90‿145)⊸XIndicators¨{klines⇐𝕩}¨ ⊑klines‿assets‿fileNames /˜¨↩ <nrowsFilter← 200⊸< ≠¨ klines ← (KNorm ((¯1⊸↓˘>)JParse⟜•FChars))¨ 1⊸⊑ assets‿fileNames /˜¨↩<filterFX←•file.Exists¨ fileNames←{t‿q←tframe‿"USDT"⋄binanceDir∾𝕩∾"_"∾q∾"-"∾t∾".json"}¨ assets←top100
+}
 
 ########################################
 ### Optimize single asset params via Genetic Algo and Grid Search
 
-klines ← "8h" LgLoad "ALGO"
-Obj ← {{¯1⊑ 𝕩.res.cumpnl} XStra 𝕨 ⊸XIndicators {klines⇐𝕩} 𝕩}
+klines ← "8h" LgLoad "RAY"
+#Obj ← {{¯1⊑ 𝕩.res.cumpnl} XStra 𝕨 ⊸XIndicators {klines⇐𝕩} 𝕩}
+Obj ← {{¯1⊑ 𝕩.res.maxddn} XStra 𝕨 ⊸XIndicators {klines⇐𝕩} 𝕩}
 iparams ← {tenkanN⇐30⋄kijunN⇐60⋄senkBN⇐120⋄cloudN⇐30}
-ADeal ⇐ ((⊣ •rand.Range ≠∘⊢)⊏⊢)
 IGntr←{ 𝕊 start‿end‿step:
 	{𝕊: step×1+•rand.Range ⌊step ÷˜end-start }  
 	
@@ -209,7 +210,7 @@ pardefs ← ⍉>⟨"tenkanN"‿(IGntr 5‿150‿5),"kijunn"‿(IGntr 5‿150‿5
 GenRan ← {𝕊: (1⊏pardefs) {𝕎𝕩}¨ @}
 #GenRan@
 ToPars← {tenkanN‿kijunN‿senkbn‿cloudn⇐𝕩}
-klines Obj˜ ToPars  GenRan@
+#klines Obj˜ ToPars  GenRan@
 #({tenkanN‿kijunN‿senkbN‿cloudN⇐𝕩} gparams.Values @) Obj klines
 Mutate ← { 𝕊 xparams:
 	ix←•rand.Range ≠⊏pardefs
@@ -217,16 +218,18 @@ Mutate ← { 𝕊 xparams:
 	(ix↑xparams)  ∾ nval ∾ (ix+1)↓xparams
 }
 #≍⟜Mutate GenRan@
-#GenRan¨ ↕4
+#(∊⊏˘)⊸/ >0.666∾˜⟜<¨ <˘(5‿2⥊ 4+↕4) ∾ 3‿2⥊ ↕4
+#ToPars 10‿30‿65‿125
+#0‿∞ PlotSingle XStra ({tenkann‿kijunn‿senkbn‿cloudn⇐𝕩} 10‿15‿65‿125)⊸XIndicators {klines⇐𝕩} "8h" LgLoad "ALGO"
+{𝕤
 
 	niter‿ntop‿nper ← 100‿20‿10
-#{𝕊:
-	#niter‿ntop‿nper ← 𝕨
 	(>(⋈⟜(Obj⟜klines ToPars))¨ GenRan¨ ↕nper) {
 		#•Show "---------------------------"
 		pars ← ⊏˘𝕩
 		#•Show 𝕩
-		ntop↑((⍒1⊸⊏˘)⊸⊏) 𝕩∾ >(⋈⟜(Obj⟜klines ToPars))¨ (Mutate¨ (•rand.Range nper) ⊏ pars) ∾ GenRan¨ ↕nper
+		ntop↑(∊⊏˘)⊸/ ((⍒1⊸⊏˘)⊸⊏) 𝕩∾ >(⋈⟜(Obj⟜klines ToPars))¨ (Mutate¨ (•rand.Range nper) ⊏ pars) ∾ GenRan¨ ↕nper
 	}´ ↕niter
- }
+}@
 
+#0‿∞ PlotSingle XStra {tenkanN⇐30⋄kijunN⇐45⋄senkBN⇐45⋄cloudN⇐60}⊸XIndicators {klines⇐𝕩} "8h" LgLoad "ALGO"
