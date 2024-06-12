@@ -161,7 +161,7 @@ PlotSingle ← { 𝕤
 		"gnuplot-ichimoku-1.txt" •file.Chars plt.Debug @
 		•SH "gnuplot"‿"-persist"‿"gnuplot-ichimoku-1.txt"
 }
-#0‿∞ PlotSingle XStra {tenkanN⇐30⋄kijunN⇐60⋄senkBN⇐120⋄cloudN⇐30}⊸XIndicators {klines⇐𝕩} "8h" LgLoad "ALGO"
+0‿∞ PlotSingle XStra {tenkanN⇐30⋄kijunN⇐45⋄senkBN⇐45⋄cloudN⇐60}⊸XIndicators {klines⇐𝕩} "8h" LgLoad "ALGO"
 
 XStats ⇐ {
 		⟨inpos,pnl,cumpnl⟩ ← 𝕩
@@ -195,21 +195,38 @@ SaveStatsRep ← {tframe←𝕨⋄("binance-"∾tframe∾"-Ichimoku.csv") •FLi
 ########################################
 ### Optimize single asset params via Genetic Algo and Grid Search
 
-#0‿∞ PlotSingle XStra {tenkanN⇐30⋄kijunN⇐60⋄senkBN⇐120⋄cloudN⇐30}⊸XIndicators {klines⇐𝕩} "8h" LgLoad "ALGO"
-
-Mutate ⇐ {
-	r←1+•rand.Range ¯1+≠⊑𝕩
-	(r↑¨𝕩) ∾¨ r↓¨(•rand.Deal ≠𝕩) ⊏ 𝕩
+klines ← "8h" LgLoad "ALGO"
+Obj ← {{¯1⊑ 𝕩.res.cumpnl} XStra 𝕨 ⊸XIndicators {klines⇐𝕩} 𝕩}
+iparams ← {tenkanN⇐30⋄kijunN⇐60⋄senkBN⇐120⋄cloudN⇐30}
+ADeal ⇐ ((⊣ •rand.Range ≠∘⊢)⊏⊢)
+IGntr←{ 𝕊 start‿end‿step:
+	{𝕊: step×1+•rand.Range ⌊step ÷˜end-start }  
+	
 }
-Genetic ⇐ {
-	pardefs ← 𝕩
-	niter‿ntop‿nper‿Obj‿opar ← 𝕨
-	#•Show opar
-#{𝕩 Obj opar}¨ 
-nper GenRan pardefs
-	(>{𝕩⋈𝕩 Obj opar}¨ nper GenRan pardefs) {
-		ntop ↑ ((⍒1⊸⊏˘)⊸⊏) 𝕩∾ >{𝕩⋈𝕩 Obj opar}¨  (⊏˘𝕩) (¬∘∊˜/⊢) (nper GenRan pardefs)∾(Mutate ⊏˘𝕩)
-		
+# Parameters with random generator functions
+pardefs ← ⍉>⟨"tenkanN"‿(IGntr 5‿150‿5),"kijunn"‿(IGntr 5‿150‿5),"senkbn"‿(IGntr 15‿150‿5),"cloudn"‿(IGntr 5‿150‿5) ⟩ 
+# Generate Random Params
+GenRan ← {𝕊: (1⊏pardefs) {𝕎𝕩}¨ @}
+#GenRan@
+ToPars← {tenkanN‿kijunN‿senkbn‿cloudn⇐𝕩}
+klines Obj˜ ToPars  GenRan@
+#({tenkanN‿kijunN‿senkbN‿cloudN⇐𝕩} gparams.Values @) Obj klines
+Mutate ← { 𝕊 xparams:
+	ix←•rand.Range ≠⊏pardefs
+	nval←{𝕏@} (1‿(ix) ⊑ pardefs) 
+	(ix↑xparams)  ∾ nval ∾ (ix+1)↓xparams
+}
+#≍⟜Mutate GenRan@
+#GenRan¨ ↕4
+
+	niter‿ntop‿nper ← 100‿20‿10
+#{𝕊:
+	#niter‿ntop‿nper ← 𝕨
+	(>(⋈⟜(Obj⟜klines ToPars))¨ GenRan¨ ↕nper) {
+		#•Show "---------------------------"
+		pars ← ⊏˘𝕩
+		#•Show 𝕩
+		ntop↑((⍒1⊸⊏˘)⊸⊏) 𝕩∾ >(⋈⟜(Obj⟜klines ToPars))¨ (Mutate¨ (•rand.Range nper) ⊏ pars) ∾ GenRan¨ ↕nper
 	}´ ↕niter
  }
 
