@@ -1,6 +1,6 @@
 # Comma-separated values (.csv)
 ⟨
-  FmtNs, GLine, WMean , Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist
+  FmtNs, GLine, WMean , Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist, Resample
 ⟩⇐
 
 
@@ -108,3 +108,7 @@ GLine← {
 
 ### Format a namespace into a table of key/values
 FmtNs ← {k←•ns.Keys 𝕩⋄⍉k≍𝕩 •ns.Get¨k}
+
+### Resample / Downsample OHLC 
+Resample ← { > {⊑‿⊑‿(⌈´)‿(⌊´)‿(¯1⊸⊑) {𝕎 𝕩}¨ <˘ ⍉ 𝕩}¨ <˘ 𝕨 {r‿c←≢𝕩⋄((⌊r÷𝕨)‿𝕨‿c)⥊𝕩} 𝕩}
+# 3 Resample "8h" LgLoad "ADA"

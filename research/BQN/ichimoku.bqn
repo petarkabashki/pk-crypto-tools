@@ -6,8 +6,8 @@ str←•Import "bqn-libs/strings.bqn"
 ⟨Split , Join,  SplitL, JoinL⟩←•Import "bqn-libs/csv.bqn"
 ⟨MP, Cholesky,Inverse⟩←•Import "bqn-libs/matrix.bqn"
 #1‿1 MP 2‿2⥊4
-⟨FmtNs, GLine, WMean, Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist⟩←•Import "pk-libs.bqn"
-ge ← •Import "genetic.bqn"
+⟨FmtNs, GLine, WMean, Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist, Resample⟩←•Import "pk-libs.bqn"
+# ge ← •Import "genetic.bqn"
 
 NSValues ← {𝕩⊸•ns.Get¨ (•ns.Keys 𝕩)} 
 Test ← {fn←{Cond‿Act 𝕊 else: Cond◶Else‿Act}´𝕩 ⋄ Fn@}
@@ -19,9 +19,7 @@ Qcsv ← (⊣•FLines⟜(csv.JoinL NFmt¨))
 FName ← {t‿q‿b←𝕨∾<𝕩⋄binanceDir∾b∾"_"∾q∾"-"∾t∾".json"}
 KNorm ← ((1⊸↑˘)∾˘(⋆⁼1⊸↓˘))
 LgLoad ← {KNorm ¯1↓˘>JParse •FChars 𝕨‿"USDT" FName 𝕩}
-Resample ← { > {⊑‿⊑‿(⌈´)‿(⌊´)‿(¯1⊸⊑) {𝕎 𝕩}¨ <˘ ⍉ 𝕩}¨ <˘ 𝕨 {r‿c←≢𝕩⋄((⌊r÷𝕨)‿𝕨‿c)⥊𝕩} 𝕩}
 
-"8h" LgLoad "ADA"
 #5↑ ((1⊸↑˘)∾˘(⋆⁼1⊸↓˘)) ¯1↓˘ >JParse •FChars binanceDir ∾ "BTC_USDT-1d.json"
 
 #################################################################
@@ -188,7 +186,6 @@ ToPars← {resampleN‿tenkanN‿kijunN‿senkbn‿cloudn⇐𝕩}
 (≠⊸∾) top100 ← •FLines "/media/mu6mula/Data/Crypto-Data-Feed/top100-1d.csv"
 (≠⊸∾) binance1d ← •FLines "/media/mu6mula/Data/Crypto-Data-Feed/binance-1d.csv"
 
-
 tframe ← "8h"
 SaveStatsRep ← {tframe←𝕨⋄("binance-"∾tframe∾"-Ichimoku.csv") •FLines csv.JoinL ((0⊸⊏)∾(⊢‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt⊸TFmt 1⊸↓)) 𝕩}
 ########################################
@@ -197,52 +194,45 @@ RollStra ← {tframe 𝕊 aparams:
   params ← {tenkanN‿kijunN‿senkBN‿cloudN⇐𝕩} aparams
   •Show tframe SaveStatsRep rep ⇐ ((<"")∾assets) ∾˘((0⊸⊏˘⊑)∾(>(1⊸⊏˘)¨)) {k←•ns.Keys 𝕩⋄ k≍˘𝕩⊸•ns.Get¨ k}¨ stats ← XStats¨ •ns.Get⟜"res"¨ restra← XStra¨params⊸XIndicators¨{klines⇐𝕩}¨ ⊑klines‿assets‿fileNames /˜¨↩ <nrowsFilter← 200⊸< ≠¨ klines ← (KNorm ((¯1⊸↓˘>)JParse⟜•FChars))¨ 1⊸⊑ assets‿fileNames /˜¨↩<filterFX←•file.Exists¨ fileNames←{t‿q←tframe‿"USDT"⋄binanceDir∾𝕩∾"_"∾q∾"-"∾t∾".json"}¨ assets←top100
 }
-"8h" RollStra 25‿35‿100‿65 
+# "8h" RollStra 25‿35‿100‿65 
 
 ########################################
 ### Optimize single asset params via Genetic Algo and Grid Search
 
-3↑ klines ← "8h" LgLoad "ALGO"
-≠5 Resample klines
-#Obj ← {{¯1⊑ 𝕩.res.cumpnl} XStra 𝕨 ⊸XIndicators {klines⇐𝕩} 𝕩}
-Obj ← { xparams←ToPars 𝕩⋄ {𝕩.ret} XStats {𝕩.res} XStra xparams⊸XIndicators {klines⇐𝕩} xparams.resampleN Resample klines}
-Obj2 ← { 𝕊 aparams:
-  params ← {tenkanN‿kijunN‿senkBN‿cloudN⇐𝕩} aparams
-  +´ {𝕩.ret}¨ stats ← XStats¨ •ns.Get⟜"res"¨ restra← XStra¨(params)⊸XIndicators¨{klines⇐𝕩}¨ ⊑klines‿assets‿fileNames /˜¨↩ <nrowsFilter← 200⊸< ≠¨ klines ← (KNorm ((¯1⊸↓˘>)JParse⟜•FChars))¨ 1⊸⊑ assets‿fileNames /˜¨↩<filterFX←•file.Exists¨ fileNames←{t‿q←tframe‿"USDT"⋄binanceDir∾𝕩∾"_"∾q∾"-"∾t∾".json"}¨ assets ← top100
+3↑ klines ← "1h" LgLoad "REN"
+Obj ← {𝕤⋄ 
+  xparams←ToPars 𝕨⋄ 
+  {𝕩.ret‿𝕩} XStats {𝕩.res} XStra xparams⊸XIndicators {klines⇐𝕩} xparams.resampleN Resample 𝕩
 }
-Obj 1‿30‿80‿115‿125 
-# iparams ← {tenkanN⇐30⋄kijunN⇐60⋄senkBN⇐120⋄cloudN⇐30}
-IGntr←{ 𝕊 start‿end‿step:
-  {𝕊: step×1+•rand.Range ⌊step ÷˜end-start }  
-  
-}
+# Obj2 ← { 𝕊 aparams:
+#   params ← {resampleN‿tenkanN‿kijunN‿senkBN‿cloudN⇐𝕩} aparams
+#   +´ {𝕩.ret}¨ stats ← XStats¨ •ns.Get⟜"res"¨ restra← XStra¨(params)⊸XIndicators¨{klines⇐𝕩}¨ ⊑klines‿assets‿fileNames /˜¨↩ <nrowsFilter← 200⊸< ≠¨ klines ← (KNorm ((¯1⊸↓˘>)JParse⟜•FChars))¨ 1⊸⊑ assets‿fileNames /˜¨↩<filterFX←•file.Exists¨ fileNames←{t‿q←tframe‿"USDT"⋄binanceDir∾𝕩∾"_"∾q∾"-"∾t∾".json"}¨ assets ← top100
+# }
+# 1‿30‿80‿115‿125 Obj klines
+# iparams ← {tenkanN⇐30⋄kijunN⇐60⋄sen{𝕤 kBN⇐120⋄cloudN⇐30}
+IGntr←{ 𝕊 start‿end‿step: {𝕊: step×1+•rand.Range ⌊step ÷˜end-start } }
 # Parameters with random generator functions
 pardefs ← ⍉>⟨"resampleN"‿(IGntr 1‿12‿1),"tenkanN"‿(IGntr 5‿150‿5),"kijunn"‿(IGntr 5‿150‿5),"senkbn"‿(IGntr 15‿150‿5),"cloudn"‿(IGntr 5‿150‿5) ⟩ 
-# Generate Random Params
+### Generate Random Params
 GenRan ← {𝕊: (1⊏pardefs) {𝕎𝕩}¨ @}
-#GenRan@
-#klines Obj˜ ToPars  GenRan@
-#({tenkanN‿kijunN‿senkbN‿cloudN⇐𝕩} gparams.Values @) Obj klines
-Mutate ← { 𝕊 xparams:
+Mutate ← { 𝕊 xparams: 
   ix←•rand.Range ≠⊏pardefs
   nval←{𝕏@} (1‿(ix) ⊑ pardefs) 
   (ix↑xparams)  ∾ nval ∾ (ix+1)↓xparams
 }
-#≍⟜Mutate GenRan@
-#(∊⊏˘)⊸/ >0.666∾˜⟜<¨ <˘(5‿2⥊ 4+↕4) ∾ 3‿2⥊ ↕4
-#ToPars 10‿30‿65‿125
 #0‿∞ PlotSingle XStra ({tenkann‿kijunn‿senkbn‿cloudn⇐𝕩} 10‿15‿65‿125)⊸XIndicators {klines⇐𝕩} "8h" LgLoad "ALGO"
-{𝕤
+### Run Genetic Algorithm for parameter optimization
 
-  niter‿ntop‿nper ← 1‿100‿20‿20
-  (>(⋈⟜(Obj ToPars))¨ GenRan¨ ↕nper) {
-    #•Show "---------------------------"
+50‿10‿10 {𝕤
+  niter‿ntop‿nper ← 𝕨
+  klines ← 𝕩
+  (>(<∾(Obj⟜klines ToPars))¨ GenRan¨ ↕nper) {
     pars ← ⊏˘𝕩
-    #•Show 𝕩
-    ntop↑(∊⊏˘)⊸/ ((⍒1⊸⊏˘)⊸⊏) 𝕩∾ >(⋈⟜(Obj ToPars))¨ (Mutate¨ (•rand.Range nper) ⊏ pars) ∾ GenRan¨ ↕nper
+    ntop↑(∊⊏˘)⊸/ ((⍒ 1⊸⊏˘)⊸⊏) 𝕩∾>(<∾(Obj⟜klines ToPars))¨ (Mutate¨ (•rand.Range nper) ⊏ pars) ∾ GenRan¨ ↕nper
   }´ ↕niter
-}@
+} klines
 
+# 10↑↕5
 # 0‿∞ PlotSingle XStra {tenkanN⇐30⋄kijunN⇐45⋄senkBN⇐45⋄cloudN⇐60}⊸XIndicators {klines⇐𝕩} "4h" LgLoad "RAY"
 5000‿∞ PlotSingle XStra {tenkanN‿kijunN‿senkBN‿cloudN⇐ ⟨ 70, 75, 25, 75 ⟩}⊸XIndicators {klines⇐𝕩} "4h" LgLoad "ALGO"
 
