@@ -4,9 +4,9 @@ csv←•Import "bqn-libs/csv.bqn"
 str←•Import "bqn-libs/strings.bqn"
 ⟨JParse⇐Parse,JExport⇐Export⟩←•Import "bqn-libs/json.bqn"
 ⟨Split , Join,  SplitL, JoinL⟩←•Import "bqn-libs/csv.bqn"
-⟨MP, Cholesky,Inverse⟩←•Import "bqn-libs/matrix.bqn"
+# ⟨MP, Cholesky,Inverse⟩←•Import "bqn-libs/matrix.bqn"
 #1‿1 MP 2‿2⥊4
-⟨FmtNs, GLine, WMean, Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist, Resample⟩←•Import "pk-libs.bqn"
+⟨FmtNs, GLine, WMean, Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist, Resample, Round⟩←•Import "pk-libs.bqn"
 # ge ← •Import "genetic.bqn"
 
 NSValues ← {𝕩⊸•ns.Get¨ (•ns.Keys 𝕩)} 
@@ -64,6 +64,8 @@ XStra2 ← {
   cumpnl⇐+`pnl
 }
 
+# (⊢ (⋈¨) 10⊸×) ↕5
+
 XStra ← {𝕤
   ⟨klines,indicators,iparams⟩ ⇐ 𝕩
 # ⟨klines,indicators,iparams⟩ ← {tenkanN⇐20⋄kijunN⇐60⋄senkBN⇐120⋄cloudN⇐30}⊸XIndicators {klines⇐𝕩} "8h" LgLoad "ADA"
@@ -75,43 +77,48 @@ klines
   lwfrT ← (∾˘⟜(⊏⟜low)) iwfl
   dwfl←(-⟜»)/wfl∾1⋄
   wfrlow← ((dwfl)/(0∾iwfl))⊏low
-  enterSigs← (tenkan>kijun)∧(close>senkoua⌈senkoub⌈kijun⌈tenkan)
-  exitSigs ← (close<senkoua⌈senkoub)∨(tenkan<kijun)
+  enterSigsL← (tenkan>kijun)∧(close>senkoua⌈senkoub⌈kijun)
+  enterSigsS← ¯1×(tenkan<kijun)∧(close<senkoua⌊senkoub⌊kijun)
+  enterSigs ← enterSigsL + enterSigsS
+  exitSigsL ← (close<senkoua⌈senkoub)∨(tenkan<kijun)
+  exitSigsS ← (close>senkoua⌊senkoub)∨(tenkan>kijun)
+  exitSigs ← exitSigsS ⋈¨ exitSigsL
   #+´wfrlows > close
   skipN←⌈´NSValues iparams⋄
-  entprice←0⋄nin←0⋄nex←0⋄
+  entprice←0⋄
   inpos‿pnl←res ⇐ {𝕤
       inpos‿pnl ⇐ <˘⍉ (skipN‿2⥊0) ∾ > (<0‿0) {𝕤
           inpos‿pnl ← 𝕨 ⋄ close‿entersig‿exitsig‿sl ← 𝕩
           {
-              ((¬inpos) ∧ entersig ∧ (1∨nex> iparams.tenkanN) ) ? ({𝕤
-					entprice↩close⋄nin↩0⋄#wfsl↩wfrlow ⋄ #⋄ pnl↩0 ⋄
+              ((inpos=0) ∧ (entersig=¯1)) ? ({𝕤
+					      entprice↩close
+                # inpos ↩ entersig
 					#•Show "Enter entprice: "∾(Nfmt entprice)∾"  price: "∾ (NFmt close)∾"  pnl: "∾(NFmt pnl)
 					#•Show "Entering..."
-					1‿0
+					      entersig‿0
               }@);
 #              (inpos ∧ ¬exitsig) ? ({𝕤
 #                               #•Show "Carry on entprice: "∾(Nfmt entprice)∾"  price: "∾ (NFmt close)∾"  pnl: "∾(NFmt pnl)
 #                  #wfsl⌈↩wfrlow
 #                  {𝕤⋄inpos‿0}@
 #              }@)
-              (inpos) ? ({𝕤
+              (inpos≠0) ? ({𝕤
                   #(exitsig∨(0∧(close>entprice)∧(close<sl))) ? ({𝕤
-                  (exitsig) ? ({𝕤
+                  ((÷⟜2 1+inpos) ⊑ exitsig) ? ({𝕤
                        #inpos↩0 #⋄ pnl↩ ⋆⁼ close ÷ entprice⋄                   
-                       pnl ← (close-entprice)
-                       nex↩0⋄
+                       pnl ← inpos × (close-entprice) #- 0.002 - 0.002
+                      #  nex↩0⋄
                        #•Show "Exit entprice: "∾(Nfmt entprice)∾"  price: "∾ (NFmt close)∾"  pnl: "∾(NFmt pnl)
                        #entprice↩0
                        0‿pnl
                   }@);
                   {𝕤⋄
-                      nin 1⊸+↩
+                      # nin 1⊸+↩
                       inpos‿0
                   }@
               }@);
               {𝕤⋄
-                  nex 1⊸+↩
+                  # nex 1⊸+↩
                   inpos‿0
               }@
           }
@@ -123,6 +130,7 @@ klines
     
 #⟨klines,indicators,res⟩←XStra {tenkanN⇐50⋄kijunN⇐100⋄senkBN⇐240⋄cloudN⇐60} XIndicators {klines⇐LdJson "INJ"‿"USDT"‿"1d"}
 #ws‿pwl ← 1000‿∞
+
 PlotSingle ← { 𝕤
   ⟨klines,indicators,res⟩← 𝕩⋄   ws‿pwl ← 𝕨⋄
   ⟨tenkan,kijun,senkoua,senkoub,wfl,wfh⟩ ← indicators
@@ -130,8 +138,8 @@ PlotSingle ← { 𝕤
   wl← pwl⌊ (≠klines) - ws
   Ww←(wl⊸↑ws⊸↓) ⋄ Wi ← (({∧´ (≥⟜ws)‿((ws+wl)⊸≥) {𝕎 𝕩}¨ 𝕩} (<⊑˘))⊸/)
 
-  xin ← /posin ← ((¬»)∧⊢) res.inpos
-  xout ← /posout ← (»∧¬) res.inpos
+  xin ← /posin ← ((¬»)∧⊢) |res.inpos
+  xout ← /posout ← (»∧¬) |res.inpos
   ymin ← ⌊´Ww low⋄ymax← ⌈´Ww high
   #close←¯2⊏˘klines⋄ # lnclose ← ⋆⁼ close
     ixs ← ↕≠klines⋄
@@ -161,22 +169,26 @@ PlotSingle ← { 𝕤
     "gnuplot-ichimoku-1.txt" •file.Chars plt.Debug @
     •SH "gnuplot"‿"-persist"‿"gnuplot-ichimoku-1.txt"
 }
-#0‿∞ PlotSingle XStra {tenkanN⇐30⋄kijunN⇐45⋄senkBN⇐45⋄cloudN⇐60}⊸XIndicators {klines⇐𝕩} "8h" LgLoad "ALGO"
+# xparams ← {resampleN‿tenkanN‿kijunN‿senkBN‿cloudN⇐ ⟨ 6, 50, 120, 5, 120 ⟩ }
+xparams ← {resampleN‿tenkanN‿kijunN‿senkBN‿cloudN⇐ ⟨ 9, 15, 110, 95, 10 ⟩ }
+
+0‿∞ PlotSingle XStra xparams⊸XIndicators {klines⇐𝕩} xparams.resampleN Resample "1h" LgLoad "SOL"
 
 XStats ⇐ {
     ⟨inpos,pnl,cumpnl⟩ ← 𝕩
-    xin ← /posin ← ((¬»)∧⊢) inpos
-    xout ← /posout ← (»∧¬) inpos
-    ret⇐¯1⊑0∾cumpnl
-    ntrades⇐≠xout⋄nwins⇐+´0<xout⊏pnl⋄nlosses⇐ntrades-nwins⋄winratio⇐nwins÷ntrades⋄
-    wins←(0⊸<⊸/)xout⊏pnl⋄losses←(0⊸≥⊸/)xout⊏pnl⋄avgwin⇐(+´÷≠)wins⋄avgloss⇐(+´÷≠)losses⋄
-    bottompnl⇐⌊´cumpnl
-    maxpnl←⌈`cumpnl
-    ddn←-maxpnl-cumpnl
-    maxddn⇐⌊´ddn
-    vol⇐√Var pnl
-    sharpe⇐ret÷vol
-    toppnl⇐⌈´maxpnl
+    minpos ← | inpos
+    xin ← /posin ← ((¬»)∧⊢) minpos
+    xout ← /posout ← (»∧¬) minpos
+    ret⇐2 Round ¯1⊑0∾cumpnl
+    ntrades⇐≠xout⋄nwins⇐+´0<xout⊏pnl⋄nlosses⇐ntrades-nwins⋄winratio⇐2 Round nwins÷ntrades⋄
+    wins←(0⊸<⊸/)xout⊏pnl⋄losses←(0⊸≥⊸/)xout⊏pnl⋄avgwin⇐2 Round (+´÷≠)wins⋄avgloss⇐2 Round (+´÷≠)losses⋄
+    bottompnl⇐2 Round ⌊´cumpnl
+    maxpnl←2 Round ⌈`cumpnl
+    ddn←2 Round -maxpnl-cumpnl
+    maxddn⇐2 Round ⌊´ddn
+    vol⇐2 Round √Var pnl
+    sharpe⇐2 Round ret÷vol
+    toppnl⇐2 Round ⌈´maxpnl
 }
 
 ToPars← {resampleN‿tenkanN‿kijunN‿senkbn‿cloudn⇐𝕩}
@@ -186,30 +198,31 @@ ToPars← {resampleN‿tenkanN‿kijunN‿senkbn‿cloudn⇐𝕩}
 (≠⊸∾) top100 ← •FLines "/media/mu6mula/Data/Crypto-Data-Feed/top100-1d.csv"
 (≠⊸∾) binance1d ← •FLines "/media/mu6mula/Data/Crypto-Data-Feed/binance-1d.csv"
 
-tframe ← "8h"
-SaveStatsRep ← {tframe←𝕨⋄("binance-"∾tframe∾"-Ichimoku.csv") •FLines csv.JoinL ((0⊸⊏)∾(⊢‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt⊸TFmt 1⊸↓)) 𝕩}
+# tframe ← "1h"
+SaveStatsRep ← {("strat-results/binance-Ichimoku.csv") •FLines csv.JoinL ((0⊸⊏)∾(⊢‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt⊸TFmt 1⊸↓)) 𝕩}
 ########################################
 ### Generate report on top100 coins
 RollStra ← {tframe 𝕊 aparams:
-  params ← {tenkanN‿kijunN‿senkBN‿cloudN⇐𝕩} aparams
-  •Show tframe SaveStatsRep rep ⇐ ((<"")∾assets) ∾˘((0⊸⊏˘⊑)∾(>(1⊸⊏˘)¨)) {k←•ns.Keys 𝕩⋄ k≍˘𝕩⊸•ns.Get¨ k}¨ stats ← XStats¨ •ns.Get⟜"res"¨ restra← XStra¨params⊸XIndicators¨{klines⇐𝕩}¨ ⊑klines‿assets‿fileNames /˜¨↩ <nrowsFilter← 200⊸< ≠¨ klines ← (KNorm ((¯1⊸↓˘>)JParse⟜•FChars))¨ 1⊸⊑ assets‿fileNames /˜¨↩<filterFX←•file.Exists¨ fileNames←{t‿q←tframe‿"USDT"⋄binanceDir∾𝕩∾"_"∾q∾"-"∾t∾".json"}¨ assets←top100
+  params ← ToPars aparams
+  # •Show ⊢ tframe SaveStatsRep 
+  # rep ⇐ 
+  ((<"")∾assets) ∾˘((0⊸⊏˘⊑)∾(>(1⊸⊏˘)¨)) {k←•ns.Keys 𝕩⋄ k≍˘𝕩⊸•ns.Get¨ k}¨ stats ← XStats¨ •ns.Get⟜"res"¨ restra← XStra¨params⊸XIndicators¨{klines⇐ 𝕩}¨ ⊑klines‿assets‿fileNames /˜¨↩ <nrowsFilter← 200⊸< ≠¨ klines ← ((params.resampleN⊸Resample ) ∘ KNorm ∘((¯1⊸↓˘>)JParse⟜•FChars))¨ 1⊸⊑ assets‿fileNames /˜¨↩<filterFX←•file.Exists¨ fileNames←{t‿q←tframe‿"USDT"⋄binanceDir∾𝕩∾"_"∾q∾"-"∾t∾".json"}¨ assets←top100
 }
-# "8h" RollStra 25‿35‿100‿65 
+# +´ 1↓ 1⊏˘ 
+# SaveStatsRep ⊢
+(SaveStatsRep ⊢ (+´∘(1⊸↓ 1⊸⊏˘)))  "1h" RollStra ⟨ 6, 50, 120, 5, 120 ⟩
+# (SaveStatsRep ⊢ (+´∘(1⊸↓ 1⊸⊏˘)))  "1h" RollStra ⟨ 9, 15, 110, 95, 10 ⟩
 
 ########################################
 ### Optimize single asset params via Genetic Algo and Grid Search
-
-3↑ klines ← "1h" LgLoad "REN"
 Obj ← {𝕤⋄ 
   xparams←ToPars 𝕨⋄ 
-  {𝕩.ret‿𝕩} XStats {𝕩.res} XStra xparams⊸XIndicators {klines⇐𝕩} xparams.resampleN Resample 𝕩
+  {(𝕩.ret)‿𝕩} XStats {𝕩.res} XStra xparams⊸XIndicators {klines⇐𝕩} xparams.resampleN Resample 𝕩
 }
 # Obj2 ← { 𝕊 aparams:
 #   params ← {resampleN‿tenkanN‿kijunN‿senkBN‿cloudN⇐𝕩} aparams
 #   +´ {𝕩.ret}¨ stats ← XStats¨ •ns.Get⟜"res"¨ restra← XStra¨(params)⊸XIndicators¨{klines⇐𝕩}¨ ⊑klines‿assets‿fileNames /˜¨↩ <nrowsFilter← 200⊸< ≠¨ klines ← (KNorm ((¯1⊸↓˘>)JParse⟜•FChars))¨ 1⊸⊑ assets‿fileNames /˜¨↩<filterFX←•file.Exists¨ fileNames←{t‿q←tframe‿"USDT"⋄binanceDir∾𝕩∾"_"∾q∾"-"∾t∾".json"}¨ assets ← top100
 # }
-# 1‿30‿80‿115‿125 Obj klines
-# iparams ← {tenkanN⇐30⋄kijunN⇐60⋄sen{𝕤 kBN⇐120⋄cloudN⇐30}
 IGntr←{ 𝕊 start‿end‿step: {𝕊: step×1+•rand.Range ⌊step ÷˜end-start } }
 # Parameters with random generator functions
 pardefs ← ⍉>⟨"resampleN"‿(IGntr 1‿12‿1),"tenkanN"‿(IGntr 5‿150‿5),"kijunn"‿(IGntr 5‿150‿5),"senkbn"‿(IGntr 15‿150‿5),"cloudn"‿(IGntr 5‿150‿5) ⟩ 
@@ -223,14 +236,19 @@ Mutate ← { 𝕊 xparams:
 #0‿∞ PlotSingle XStra ({tenkann‿kijunn‿senkbn‿cloudn⇐𝕩} 10‿15‿65‿125)⊸XIndicators {klines⇐𝕩} "8h" LgLoad "ALGO"
 ### Run Genetic Algorithm for parameter optimization
 
-50‿10‿10 {𝕤
+FmtParG ← (("par"‿"obj" ∾ 2⊸↑˘) ∾˘ ({k←•ns.Keys ⊑ 𝕩⋄ k∾ > (•ns.Get¨⟜(k))¨ ⥊𝕩 }  2⊸↓˘))
+# ≠ "1h" LgLoad "REN"
+# ⌽ 7↑˘ (1⊸↑˘ ∾˘ 2⊸↓˘) 1↓ re
+re ← (1⊸↑˘ ∾˘ 2⊸↓˘) FmtParG 50‿20‿10 {𝕤
   niter‿ntop‿nper ← 𝕨
   klines ← 𝕩
   (>(<∾(Obj⟜klines ToPars))¨ GenRan¨ ↕nper) {
     pars ← ⊏˘𝕩
     ntop↑(∊⊏˘)⊸/ ((⍒ 1⊸⊏˘)⊸⊏) 𝕩∾>(<∾(Obj⟜klines ToPars))¨ (Mutate¨ (•rand.Range nper) ⊏ pars) ∾ GenRan¨ ↕nper
   }´ ↕niter
-} klines
+} klines ← "1h" LgLoad "SHIB"
+•Show ⌽ re
+"strat-results/opt-ichimoku.csv" •FLines csv.JoinL •Fmt¨ re
 
 # 10↑↕5
 # 0‿∞ PlotSingle XStra {tenkanN⇐30⋄kijunN⇐45⋄senkBN⇐45⋄cloudN⇐60}⊸XIndicators {klines⇐𝕩} "4h" LgLoad "RAY"
