@@ -1,6 +1,6 @@
 
 ⟨Gnuplot⟩ ← •Import "Gnuplot.bqn"
-
+⟨ToTimestamp, FromTimestamp⟩ ← •Import "bqn-libs/datetime.bqn"
 ⟨JParse⇐Parse,JExport⇐Export⟩←•Import "bqn-libs/json.bqn"
 ⟨Split , Join,  SplitL, JoinL⟩←•Import "bqn-libs/csv.bqn"
 ⟨MP, Cholesky,Inverse⟩←•Import "bqn-libs/matrix.bqn"
@@ -37,49 +37,6 @@ x ← ⍉≍1⊏˘ df
 y Ols x 
 
 
-#######################################
-### Hurst Exponent
-#######################################
-binanceDir← "/media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data/binance/"
-FName ← {t‿q‿b←𝕨∾<𝕩⋄binanceDir∾b∾"_"∾q∾"-"∾t∾".json"}
-≠df ← "1d" { ¯1↓˘>JParse •FChars 𝕨‿"USDT" FName 𝕩} "BTC"
-≠x ← 32↑ ¯1⊏˘ df 
-x ←32↑ 1↓ (-⟜1∘÷⟜») ¯1⊏˘ df 
-x
-x←1+↕5
-HRs ← {Fn x: 
-	y ← (-⟜(+´÷≠)) x
-	z ← +` y
-	rn ← (⌈´-⌊´) z ⋄ 
-	# ((+´ ⋆⟜2)÷≠) y
-	sn ← √ ((+´ ⋆⟜2)÷≠) y ⋄ 
-	rn÷sn 
-
-}
-Hrs x
-√2
-Hurst x
-Hurst¨ <˘ 64 ↕ x
-Hurst¨ 16 ↕ x
-
-
-# Hurst ← { Fn x:
-x ← 1+↕16
-	p←2⋆⁼≠x
-	sr ← 2+↕¯1+ 2⋆⁼≠x
-	srs ← 2⊸⋆ sr
-	srn←(≠x)÷srs
-	HRs¨¨ (srs ×¨↕¨srn) {𝕩↑𝕨↓x}¨¨ srs
-	rss ← (+´÷≠)¨ HRs¨¨ (srs ×¨↕¨srn) {𝕩↑𝕨↓x}¨¨ srs
-	(2⋆⁼rss)
-	(2⋆⁼rss) Ols (2⋆⁼srs)
-# }
-x
-Hurst¨ <˘ 128 ↕ x
-2 ⋆⁼ 64
-x← 1+↕2⋆4
-
-Hurst 1+↕2⋆4
 ### Partition 𝕩 into 𝕨 parts
 Partn ← { i0 Fn y: (⌊i0×↕⊸÷≠y)⊔y } 
 
