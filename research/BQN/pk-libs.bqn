@@ -1,10 +1,15 @@
 # Comma-separated values (.csv)
 ⟨
-  FmtNs, GLine, WMean , Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist, Resample, Round
+  FmtNs, GLine, WMean , Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist, Resample, Round, Ols
 ⟩⇐
 
 
+⟨MP, Cholesky,Inverse⟩←•Import "bqn-libs/matrix.bqn"
 ⟨Gnuplot⟩ ← •Import "Gnuplot.bqn"
+
+##############################################
+### Ordinary Least Squares
+Ols ← {xp←⍉x←1∾˘𝕩⋄((Inverse xp MP x) MP xp) MP 𝕨}
 
 #################################################################
 ###  Statistical Functions

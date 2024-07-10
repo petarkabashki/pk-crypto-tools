@@ -15,8 +15,8 @@ IfElse ← {cond‿True‿False: cond◶False‿True @}
 NFmt ← ⟨"¯"⟩‿⟨"-"⟩⊸str.ReplaceAll ∘ •Fmt
 TFmt ← {r←𝕩⋄⍉>𝕨 {𝕎¨ 𝕩⊏˘r}¨ (↕≠𝕨)}
 binanceDir← "/media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data/binance/"
-Qcsv ← (⊣•FLines⟜(csv.JoinL NFmt¨)) 
 FName ← {t‿q‿b←𝕨∾<𝕩⋄binanceDir∾b∾"_"∾q∾"-"∾t∾".json"}
+Qcsv ← (⊣•FLines⟜(csv.JoinL NFmt¨)) 
 KNorm ← ((1⊸↑˘)∾˘(⋆⁼1⊸↓˘))
 LgLoad ← {KNorm ¯1↓˘>JParse •FChars 𝕨‿"USDT" FName 𝕩}
 
@@ -78,7 +78,7 @@ klines
   dwfl←(-⟜»)/wfl∾1⋄
   wfrlow← ((dwfl)/(0∾iwfl))⊏low
   enterSigsL← (tenkan>kijun)∧(close>senkoua⌈senkoub⌈kijun)
-  enterSigsS← ¯1×(tenkan<kijun)∧(close<senkoua⌊senkoub⌊kijun)
+  enterSigsS← ¯1×(tenkan<kijun)∧(close<senkoua⌊senkoub)
   enterSigs ← enterSigsL + enterSigsS
   exitSigsL ← (close<senkoua⌈senkoub)∨(tenkan<kijun)
   exitSigsS ← (close>senkoua⌊senkoub)∨(tenkan>kijun)
@@ -239,14 +239,14 @@ Mutate ← { 𝕊 xparams:
 FmtParG ← (("par"‿"obj" ∾ 2⊸↑˘) ∾˘ ({k←•ns.Keys ⊑ 𝕩⋄ k∾ > (•ns.Get¨⟜(k))¨ ⥊𝕩 }  2⊸↓˘))
 # ≠ "1h" LgLoad "REN"
 # ⌽ 7↑˘ (1⊸↑˘ ∾˘ 2⊸↓˘) 1↓ re
-re ← (1⊸↑˘ ∾˘ 2⊸↓˘) FmtParG 50‿20‿10 {𝕤
+re ← (1⊸↑˘ ∾˘ 2⊸↓˘) FmtParG 40‿20‿10 {𝕤
   niter‿ntop‿nper ← 𝕨
   klines ← 𝕩
   (>(<∾(Obj⟜klines ToPars))¨ GenRan¨ ↕nper) {
     pars ← ⊏˘𝕩
     ntop↑(∊⊏˘)⊸/ ((⍒ 1⊸⊏˘)⊸⊏) 𝕩∾>(<∾(Obj⟜klines ToPars))¨ (Mutate¨ (•rand.Range nper) ⊏ pars) ∾ GenRan¨ ↕nper
   }´ ↕niter
-} klines ← "1h" LgLoad "SHIB"
+} klines ← "1h" LgLoad "SOL"
 •Show ⌽ re
 "strat-results/opt-ichimoku.csv" •FLines csv.JoinL •Fmt¨ re
 
