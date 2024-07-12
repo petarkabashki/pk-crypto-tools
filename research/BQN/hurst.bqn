@@ -33,33 +33,35 @@ Hurst ← { Fn x:
 	¯1⊑(2⋆⁼rss) Ols (2⋆⁼srs)
 }
 
-binanceDir← "/media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data/binance/"
-FName ← {t‿q‿b←𝕨∾<𝕩⋄binanceDir∾b∾"_"∾q∾"-"∾t∾".json"}
-≠df ← "4h" { ¯1↓˘>JParse •FChars 𝕨‿"USDT" FName 𝕩} "BTC"
-#≠x ← 0∾ 1↓ (-⟜1∘÷⟜») ¯1⊏˘ df 
+# binanceDir← "/media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data/binance/"
+# FName ← {t‿q‿b←𝕨∾<𝕩⋄binanceDir∾b∾"_"∾q∾"-"∾t∾".json"}
+# ≠df ← "4h" { ¯1↓˘>JParse •FChars 𝕨‿"USDT" FName 𝕩} "BTC"
+# #≠x ← 0∾ 1↓ (-⟜1∘÷⟜») ¯1⊏˘ df 
 
-ws‿ww ← 2000‿(2000)
-≠c ←ww↑ ws↓ ¯1⊏˘ df 
-≠x ← 0∾ 1↓ (-⟜1∘÷⟜») c
+# ws‿ww ← 2000‿(2000)
+# ≠c ←ww↑ ws↓ ¯1⊏˘ df 
+# ≠x ← 0∾ 1↓ (-⟜1∘÷⟜») c
 
-3↑ts ← 3⊸↑¨ ToTimestamp¨  ÷⟜1000 ww↑ws↓ ⊏˘df
-# •UnixTime¨ ÷⟜1000 5↑ ⊏˘df
-# x←1+↕5
+# 3↑ts ← 3⊸↑¨ ToTimestamp¨  ÷⟜1000 ww↑ws↓ ⊏˘df
+# # •UnixTime¨ ÷⟜1000 5↑ ⊏˘df
+# # x←1+↕5
 
 
-hw ← 256
-≢hx ← ≍˘Hurst¨ <˘ hw ↕ x
+# hw ← 256
+# ≢hx ← ≍˘Hurst¨ <˘ hw ↕ x
 
-plt ← Gnuplot "
-	title 'Ichimoku Cloud' font ',18'
-	terminal wxt size 2400,900
-	y2tics 0.20 nomirror tc lt 2
-	grid
-	parametric
-	style line 5 lt rgb 'cyan' lw 3 pt 6"
+# plt ← Gnuplot "
+# 	title 'Ichimoku Cloud' font ',18'
+# 	terminal wxt size 2400,900
+# 	y2tics 0.20 nomirror tc lt 2
+# 	grid
+# 	parametric
+# 	style line 5 lt rgb 'cyan' lw 3 pt 6"
 
-plt.Plot (((hw⊸+∘↕≠)∾˘⊢)hx)‿"lw 1 lc rgb 'blue' with lines"
-plt.Plot (((↕≠)∾˘⊢)≍˘⋆⁼c)‿"lw 2 lc rgb 'orange' with lines axes x1y2"
+# plt.Plot (((hw⊸+∘↕≠)∾˘⊢)hx)‿"lw 1 lc rgb 'blue' with lines"
+# plt.Plot (((↕≠)∾˘⊢)≍˘⋆⁼c)‿"lw 2 lc rgb 'orange' with lines axes x1y2"
 
-"gnuplot-tmp-1.txt"•file.Chars plt.Debug @
-•SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
+# "gnuplot-tmp-1.txt"•file.Chars plt.Debug @
+# •SH "gnuplot"‿"-persist"‿"gnuplot-tmp-1.txt"
+
+

@@ -1,6 +1,6 @@
 # Comma-separated values (.csv)
 ⟨
-  FmtNs, GLine, WMean , Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist, Resample, Round, Ols
+  FmtNs, GLine, WMean , Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist, Resample, Round, Ols, Eye
 ⟩⇐
 
 
@@ -121,3 +121,7 @@ Resample ← { > {⊑‿⊑‿(⌈´)‿(⌊´)‿(¯1⊸⊑) {𝕎 𝕩}¨ <˘ 
 ### Round 𝕩 to 𝕨 decimal places
 Round ← ((10⊸⋆⊣) ((⌊0.5⊸+∘×)÷⊣) ⊢)
 # 3 Round 0.16666666
+
+### Matrix eye (I)
+Eye ← (>⌽∘(1+↕)⌽¨(⊢↑¨(⥊⟜1))) 
+# Eye 10
