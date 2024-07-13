@@ -27,14 +27,11 @@ class LPPLS(object):
         self.indicator_result = []
 
     @staticmethod
-    # @njit
+    @njit
     def lppls(t, tc, m, w, a, b, c1, c2):
-        print('lppls t: ', t)
-        print('lppls tc, m, w, a, b, c1, c2', tc, m, w, a, b, c1, c2)
         dt = np.abs(tc - t) + 1e-8
-        wphase = w * np.log(dt)
         return a + np.power(dt, m) * (
-            b + ((c1 * np.cos(wphase)) + (c2 * np.sin(w * wphase)))
+            b + ((c1 * np.cos(w * np.log(dt))) + (c2 * np.sin(w * np.log(dt))))
         )
 
     def func_restricted(self, x, *args):
@@ -53,23 +50,17 @@ class LPPLS(object):
         observations = args[0]
 
         rM = self.matrix_equation(observations, tc, m, w)
-        # print('func_restricted rM', rM)
         a, b, c1, c2 = rM[:, 0].tolist()
-        print('func_restricted a, b, c1, c2 = ', a, b, c1, c2)
         # print('type', type(res))
         # print('func_restricted', res)
 
         delta = self.lppls(observations[0, :], tc, m, w, a, b, c1, c2)
-        print('func_restricted lppls', (delta))
-        print('func_restricted lppls', sum(delta))
         delta = np.subtract(delta, observations[1, :])
-        print('func_restricted delta', (delta))
-        print('func_restricted delta', sum(delta))
         delta = np.power(delta, 2)
         return np.sum(delta)
 
     @staticmethod
-    # @njit
+    @njit
     def matrix_equation(observations, tc, m, w):
         """
         Derive linear parameters in LPPLs from nonlinear ones.
