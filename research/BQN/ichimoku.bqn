@@ -6,7 +6,7 @@ str←•Import "bqn-libs/strings.bqn"
 ⟨Split , Join,  SplitL, JoinL⟩←•Import "bqn-libs/csv.bqn"
 # ⟨MP, Cholesky,Inverse⟩←•Import "bqn-libs/matrix.bqn"
 #1‿1 MP 2‿2⥊4
-⟨FmtNs, GLine, WMean, Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist, Resample, Round⟩←•Import "pk-libs.bqn"
+⟨FmtNs, GLine, WMean, Ema, Var, WVar, WStd, GBars, CumBins, CumBinsPct, HBins, Hist, PHist, Resample, Round, FmtA⟩←•Import "pk-libs.bqn"
 # ge ← •Import "genetic.bqn"
 
 NSValues ← {𝕩⊸•ns.Get¨ (•ns.Keys 𝕩)} 
@@ -20,6 +20,8 @@ Qcsv ← (⊣•FLines⟜(csv.JoinL NFmt¨))
 KNorm ← ((1⊸↑˘)∾˘(⋆⁼1⊸↓˘))
 LgLoad ← {KNorm ¯1↓˘>JParse •FChars 𝕨‿"USDT" FName 𝕩}
 
+
+# FmtA ← {"⟨"∾(𝕩)∾"⟩" } 2↓ ( ∾´ (", "⊸∾ •Fmt)¨) 
 #5↑ ((1⊸↑˘)∾˘(⋆⁼1⊸↓˘)) ¯1↓˘ >JParse •FChars binanceDir ∾ "BTC_USDT-1d.json"
 
 #################################################################
@@ -90,7 +92,7 @@ klines
       inpos‿pnl ⇐ <˘⍉ (skipN‿2⥊0) ∾ > (<0‿0) {
           inpos‿pnl ← 𝕨 ⋄ close‿entersig‿exitsig‿sl ← 𝕩
           {
-              ((inpos=0) ∧ (0≠entersig)) ? ({𝕤
+              ((inpos=0) ∧ (1=entersig)) ? ({𝕤
 					      entprice↩close
                 # inpos ↩ entersig
 					#•Show "Enter entprice: "∾(Nfmt entprice)∾"  price: "∾ (NFmt close)∾"  pnl: "∾(NFmt pnl)
@@ -195,24 +197,27 @@ ToPars ← {resampleN‿tenkanN‿kijunN‿senkbn‿cloudn⇐𝕩}
 
 ########################################
 ### Test TOP 100 coins 
+assets ← 30↑  (¬∊⟜"USDT"‿"USDC"‿"BUSD")⊸/ •Flines "/media/mu6mula/Data/Crypto-Data-Feed/top100MarketCap.txt"
 
 (≠⊸∾) top100 ← •FLines "/media/mu6mula/Data/Crypto-Data-Feed/top100-1d.csv"
 (≠⊸∾) binance1d ← •FLines "/media/mu6mula/Data/Crypto-Data-Feed/binance-1d.csv"
 
-# tframe ← "1h"
+
+# tframe ← "4h"
 SaveStatsRep ← {("strat-results/binance-Ichimoku.csv") •FLines csv.JoinL ((0⊸⊏)∾(⊢‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt‿NFmt⊸TFmt 1⊸↓)) 𝕩}
 ########################################
 ### Generate report on top100 coins
-
+# ("4h"⊸RollStra)¨  20↑ ⊏˘re
+# ("4h"⊸RollStra)¨  20↑ ⊏˘re
 RollStra ← {tframe 𝕊 aparams:
   params ← ToPars aparams
   # •Show ⊢ tframe SaveStatsRep 
   # rep ⇐ 
-  ((<"")∾assets) ∾˘((0⊸⊏˘⊑)∾(>(1⊸⊏˘)¨)) {k←•ns.Keys 𝕩⋄ k≍˘𝕩⊸•ns.Get¨ k}¨ stats ← XStats¨ •ns.Get⟜"res"¨ restra← XStra¨params⊸XIndicators¨{klines⇐ 𝕩}¨ ⊑klines‿assets‿fileNames /˜¨↩ <nrowsFilter← 200⊸< ≠¨ klines ← ((params.resampleN⊸Resample ) ∘ KNorm ∘((¯1⊸↓˘>)JParse⟜•FChars))¨ 1⊸⊑ assets‿fileNames /˜¨↩<filterFX←•file.Exists¨ fileNames←{t‿q←tframe‿"USDT"⋄binanceDir∾𝕩∾"_"∾q∾"-"∾t∾".json"}¨ assets←top100
+  ((<"")∾assets) ∾˘((0⊸⊏˘⊑)∾(>(1⊸⊏˘)¨)) {k←•ns.Keys 𝕩⋄ k≍˘𝕩⊸•ns.Get¨ k}¨ stats ← XStats¨ •ns.Get⟜"res"¨ restra← XStra¨params⊸XIndicators¨{klines⇐ 𝕩}¨ ⊑klines‿assets‿fileNames /˜¨↩ <nrowsFilter← 200⊸< ≠¨ klines ← ((params.resampleN⊸Resample ) ∘ KNorm ∘((¯1⊸↓˘>)JParse⟜•FChars))¨ 1⊸⊑ assets‿fileNames /˜¨↩<filterFX←•file.Exists¨ fileNames←{t‿q←tframe‿"USDT"⋄binanceDir∾𝕩∾"_"∾q∾"-"∾t∾".json"}¨ assets #←top100
 }
 # +´ 1↓ 1⊏˘ 
 # SaveStatsRep ⊢
-(SaveStatsRep ⊢ (+´∘(1⊸↓ 1⊸⊏˘)))  "1h" RollStra ⟨8, 5, 40, 75, 90⟩
+(SaveStatsRep ⊢ ((÷⟜(≠assets))+´∘(1⊸↓ 1⊸⊏˘)))  "4h" RollStra ⟨2, 30, 105, 70, 65⟩
 
 # (SaveStatsRep ⊢ (+´∘(1⊸↓ 1⊸⊏˘)))  "1h" RollStra ⟨ 9, 15, 110, 95, 10 ⟩
 
@@ -230,7 +235,7 @@ Obj ← {𝕤⋄
 IGntr←{ 𝕊 start‿end‿step: {𝕊: step×1+•rand.Range ⌊step ÷˜end-start } }
 # Parameters with random generator functions
 # 
-pardefs ← ⍉>⟨"resampleN"‿(IGntr 1‿12‿1),"tenkanN"‿(IGntr 5‿150‿5),"kijunn"‿(IGntr 5‿150‿5),"senkbn"‿(IGntr 15‿150‿5),"cloudn"‿(IGntr 5‿150‿5) ⟩ 
+pardefs ← ⍉>⟨"resampleN"‿(IGntr 1‿24‿1),"tenkanN"‿(IGntr 5‿150‿5),"kijunn"‿(IGntr 5‿150‿5),"senkbn"‿(IGntr 15‿150‿5),"cloudn"‿(IGntr 5‿150‿5) ⟩ 
 ### Generate Random Params
 GenRan ← {𝕊: (1⊏pardefs) {𝕎𝕩}¨ @}
 Mutate ← { 𝕊 xparams: 
@@ -245,25 +250,24 @@ FmtParG ← (("par"‿"obj" ∾ 2⊸↑˘) ∾˘ ({k←•ns.Keys ⊑ 𝕩⋄ k�
 # ≠ "1h" LgLoad "REN"
 # ⌽ 7↑˘ (1⊸↑˘ ∾˘ 2⊸↓˘) 1↓ re
 
-re ← ((⍋ 1⊸⊏˘)⊸⊏) (1⊸↑˘ ∾˘ 2⊸↓˘) FmtParG 50‿25‿25 {𝕤
+∾´ reh‿re ← ↑‿↓ {1𝕎𝕩}¨< ((⍒ 1⊸⊏˘)⊸⊏) (1⊸↑˘ ∾˘ 2⊸↓˘) FmtParG 100‿35‿25 {𝕤
   niter‿ntop‿nper ← 𝕨
   klines ← 𝕩
   (>(<∾(Obj⟜klines ToPars))¨ GenRan¨ ↕nper) {
     pars ← ⊏˘ 𝕩
     ntop↑(∊⊏˘)⊸/ ((⍒ 1⊸⊏˘)⊸⊏) 𝕩∾>(<∾(Obj⟜klines ToPars))¨ (Mutate¨ (•rand.Range nper) ⊏ pars) ∾ GenRan¨ ↕nper
   }´ ↕niter
-} klines ← "1h" LgLoad "ALGO"
+} klines ← "4h" LgLoad "SOL"
 
-# FmtPar ← {(1↓˘𝕩)∾˘˜(<"par") ∾ {"⟨"∾(𝕩)∾"⟩" }¨ 2↓¨ ( ∾´ (", "⊸∾ •Fmt)¨)¨ 1⊸↓ ⊏˘ 𝕩} 
-rre←{(1↓˘𝕩)∾˘˜(<"par") ∾ {"⟨"∾(𝕩)∾"⟩" }¨ 2↓¨ ( ∾´ (", "⊸∾ •Fmt)¨)¨ 1⊸↓ ⊏˘ 𝕩}  re
+rre←((FmtA¨ ⊏˘) ∾˘ 1⊸↓˘)  re
 •Show rre
 "strat-results/opt-ichimoku.csv" •FLines csv.JoinL •Fmt¨ rre
 
-ro←{(1↓˘𝕩)∾˘˜ {"⟨"∾(𝕩)∾"⟩" }¨ 2↓¨ ( ∾´ (", "⊸∾ •Fmt)¨)¨ ⊏˘ 𝕩}  ((⍒ 1⊸⊏˘)⊸⊏) >(⋈⟜((+´ 1⊸↓)(1⊏˘ "1h"⊸RollStra)))¨ 20↑ ⊏˘re
+ro← (⊏˘ ∾˘ ((÷⟜1000∘⌊×⟜1000) ∘ ÷⟜(≠assets)¨ (1⊸⊏˘))) {(1↓˘𝕩)∾˘˜ {"⟨"∾(𝕩)∾"⟩" }¨ 2↓¨ ( ∾´ (", "⊸∾ •Fmt)¨)¨ ⊏˘ 𝕩}  ((⍒ 1⊸⊏˘)⊸⊏) >(⋈⟜((+´ 1⊸↓)(1⊸⊏˘ "4h"⊸RollStra)))¨ 1↓ ⊏˘re
 •Show ro
 ("strat-results/roll-stra-Opt.csv") •FLines csv.JoinL "par"‿"ret" ∾ (1⊸↑˘ ∾˘ (NFmt¨ 1⊸↓˘)) ro
   
-•Parse 1↑˘ro
+# •Parse 1↑˘ro
 
 
 
