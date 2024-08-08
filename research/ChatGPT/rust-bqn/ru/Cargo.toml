@@ -1,0 +1,12 @@
+[package]
+name = "hello_world"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cbqn = "0.1.1"
+# cbqn-sys = "0.2.0"
+
+[[bin]]
+name = "ru"
+path = "src/main.rs"
