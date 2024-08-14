@@ -1,6 +1,7 @@
 #include <Python.h>
 #include <numpy/arrayobject.h>
 
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 // C function to calculate trades (entry, exit indices, and position type)
 static PyObject* calculate_trades(PyObject* self, PyObject* args) {
     PyArrayObject *long_entry_mask, *long_exit_mask, *short_entry_mask, *short_exit_mask;
@@ -97,9 +98,64 @@ static PyObject* calculate_trades(PyObject* self, PyObject* args) {
     return Py_BuildValue("O", trade_details);
 }
 
+static PyObject* calculate_positions(PyObject* self, PyObject* args) {
+    PyObject* itrades_obj;
+    int price_data_length;
+
+    // Parse the input arguments: itrades array and the length of the price data array
+    if (!PyArg_ParseTuple(args, "O!i", &PyArray_Type, &itrades_obj, &price_data_length)) {
+        return NULL;
+    }
+
+    // Ensure itrades is indeed a NumPy array
+    if (!PyArray_Check(itrades_obj)) {
+        PyErr_SetString(PyExc_TypeError, "Expected a NumPy array for itrades");
+        return NULL;
+    }
+
+    // Get the shape of the itrades array
+    npy_intp* itrades_shape = PyArray_SHAPE((PyArrayObject*)itrades_obj);
+    npy_intp num_trades = itrades_shape[0];
+
+    // Get pointers to the data of itrades
+    int* itrades_data = (int*)PyArray_DATA((PyArrayObject*)itrades_obj);
+
+    // Create an array of positions initialized to 0
+    npy_intp dims[1] = {price_data_length};
+    PyObject* positions_array = PyArray_SimpleNew(1, dims, NPY_INT);
+
+    if (positions_array == NULL) {
+        return NULL;
+    }
+
+    int* positions_data = (int*)PyArray_DATA((PyArrayObject*)positions_array);
+
+    // Initialize the positions array to 0
+    for (int i = 0; i < price_data_length; i++) {
+        positions_data[i] = 0;
+    }
+
+    // Fill the positions array based on itrades
+    for (npy_intp i = 0; i < num_trades; i++) {
+        int start_index = itrades_data[i * 3];
+        int end_index = itrades_data[i * 3 + 1];
+        int position_type = itrades_data[i * 3 + 2];
+
+        // Set positions from start_index to end_index with position_type
+        for (int j = start_index+1; j <= end_index && j < price_data_length; j++) {
+            positions_data[j] = position_type;
+        }
+    }
+
+    // Return the positions array
+    return positions_array;
+}
+
+
 // Define the methods for the module
 static PyMethodDef PositionToolsMethods[] = {
     {"calculate_trades", calculate_trades, METH_VARARGS, "Calculate trades (entry index, exit index, and position type) from entry/exit masks"},
+    {"calculate_positions", calculate_positions, METH_VARARGS, "Calculate positions from itrades"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -120,4 +176,4 @@ PyMODINIT_FUNC PyInit_position_tools(void) {
 
 
 
-// gcc -shared -o position_tools.so -fPIC position_tools.c -I/home/mu6mula/miniconda3/envs/py310/include/python3.10 -I/home/mu6mula/miniconda3/envs/py310/include/python3.10 -I/home/mu6mula/miniconda3/envs/py310/lib/python3.10/site-packages/numpy/core/include
+// clear & rm position_tools.so & gcc -shared -o position_tools.so -fPIC position_tools.c -I/home/mu6mula/miniconda3/envs/py310/include/python3.10 -I/home/mu6mula/miniconda3/envs/py310/include/python3.10 -I/home/mu6mula/miniconda3/envs/py310/lib/python3.10/site-packages/numpy/core/include

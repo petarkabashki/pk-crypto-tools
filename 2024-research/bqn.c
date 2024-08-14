@@ -4,26 +4,6 @@
 #include <bqnffi.h>
 #include <numpy/arrayobject.h>
 
-// npy_type_mapping = {
-//     0: "NPY_BOOL",
-//     1: "NPY_BYTE",
-//     2: "NPY_UBYTE",
-//     3: "NPY_SHORT",
-//     4: "NPY_USHORT",
-//     5: "NPY_INT",
-//     6: "NPY_UINT",
-//     7: "NPY_LONG",
-//     8: "NPY_ULONG",
-//     9: "NPY_LONGLONG",
-//     10: "NPY_ULONGLONG",
-//     11: "NPY_FLOAT",
-//     12: "NPY_DOUBLE",
-//     13: "NPY_LONGDOUBLE",
-//     14: "NPY_CFLOAT",
-//     15: "NPY_CDOUBLE",
-//     16: "NPY_CLONGDOUBLE"
-// }
-
 // Define the eval function that will evaluate BQN code
 static PyObject* pybqn_call(PyObject* self, PyObject* args) {
     PyObject* numpy_array;
@@ -41,93 +21,80 @@ static PyObject* pybqn_call(PyObject* self, PyObject* args) {
 
     // Get the rank (number of dimensions) of the array
     int rank = PyArray_NDIM((PyArrayObject*)numpy_array);
+    // return PyFloat_FromDouble(rank);
+    // printf('input rank: %i\n',rank);
     // Get the shape of the array (pointer to an array of npy_intp)
     npy_intp* shape = PyArray_SHAPE((PyArrayObject*)numpy_array);
+
+    // return PyFloat_FromDouble(shape[0]);
     // Get the type of the NumPy array
     int array_type = PyArray_TYPE((PyArrayObject*)numpy_array);
+    // printf('input shape: %i\n',shape[0]);
+    // return shape;
+    void* array_data = PyArray_DATA((PyArrayObject*)numpy_array);
 
     BQNV bqn_arr;
+    rank = 1;
     switch (array_type)
     {
     case NPY_BOOL:
     case NPY_BYTE:
     case NPY_UBYTE:
-        bqn_arr = bqn_makeI8Arr(rank, shape, PyArray_DATA((PyArrayObject*)numpy_array));
-        /* code */
-        break;
+        // bqn_arr = bqn_makeI8Arr(rank, shape, PyArray_DATA((PyArrayObject*)numpy_array));
+        // /* code */
+        // break;
     case NPY_SHORT:
     case NPY_USHORT:
-        bqn_arr = bqn_makeI16Arr(rank, shape, PyArray_DATA((PyArrayObject*)numpy_array));
+        bqn_arr = bqn_makeI16Arr(rank, shape, array_data);
         /* code */
         break;
     case NPY_INT:
     case NPY_UINT:
     case NPY_LONG:
     case NPY_ULONG:
-        bqn_arr = bqn_makeI32Arr(rank, shape, PyArray_DATA((PyArrayObject*)numpy_array));
-        /* code */
+        bqn_arr = bqn_makeI32Arr(rank, shape, array_data);
         break;
     case NPY_LONGLONG:
     case NPY_ULONGLONG:
+        bqn_arr = bqn_makeI32Arr(rank, shape, PyArray_DATA((PyArrayObject*)numpy_array));
+        break;
     case NPY_FLOAT:
     case NPY_DOUBLE:
     case NPY_LONGDOUBLE:
     case NPY_CFLOAT:
     case NPY_CDOUBLE:
     case NPY_CLONGDOUBLE:
-        bqn_arr = bqn_makeF64Arr(rank, shape, PyArray_DATA((PyArrayObject*)numpy_array));
+        bqn_arr = bqn_makeF64Arr(rank, shape, array_data);
         break;
     default:
-        bqn_arr = bqn_makeF64Arr(rank, shape, PyArray_DATA((PyArrayObject*)numpy_array));
-    } 
-
-    // BQN_EXP BQNV res = bqn_evalCStr(input_string);
+        bqn_arr = bqn_makeF64Arr(rank, shape, array_data);
+        break;
+    }
 
     BQN_EXP BQNV xpr = bqn_evalCStr(input_string);
     BQN_EXP BQNV res = bqn_call1(xpr, bqn_arr);
 
     if (bqn_type(res) == 1){
-        return PyFloat_FromDouble(bqn_toF64(res));
+        return PyLong_FromLong(bqn_toF64(res));
     } else if (bqn_type(res) == 0 ) {
 
         size_t rrank = bqn_rank(res);
         size_t rshape[rrank];    
         bqn_shape(res, rshape);
-        
+
         npy_intp res_dims[1] = {rshape[0]}; // {10};  // 1D array of length 10
 
-        PyObject* numpy_array_res = PyArray_SimpleNew(1, res_dims, NPY_DOUBLE);
-        double* array_data_res = (double*)PyArray_DATA((PyArrayObject*)numpy_array);
+        PyObject* numpy_array_res = PyArray_SimpleNew(1, res_dims, NPY_INT);
+        int* array_data_res = (int*)PyArray_DATA((PyArrayObject*)numpy_array);
+
         bqn_readI32Arr(res, array_data_res);
         bqn_free(res);
-        return numpy_array_res;
+        Py_INCREF(numpy_array_res);
+        return Py_BuildValue("O", numpy_array_res);
 
     } else {
         return NULL;
     }
-    // printf("res: %li \n",bqn_type(res));
-
-
-    npy_intp res_dims[1] = {0};  // 1D array with 0 elements
-
-//     // Create a new NumPy array of type double (NPY_DOUBLE)
-    
-
-//     // Check if the array creation was successful
-//     if (numpy_array == NULL) {
-//         return NULL;  // Return NULL to indicate an error
-//     }
-
-//     // Fill the array with values
-//     double* array_data = (double*)PyArray_DATA((PyArrayObject*)numpy_array);
-//     // for (int i = 0; i < 10; i++) {
-//     //     array_data[i] = i * 5;  // Just an example; set values to 0.0, 1.0, ..., 9.0
-//     // }
-
-//     bqn_readI32Arr(res, array_data);
-//     bqn_free(res);
-//     // Return the NumPy array to Python
-//     return Py_BuildValue("O", numpy_array);
 
 }
 
@@ -170,7 +137,11 @@ PyMODINIT_FUNC PyInit_bqn(void) {
     return PyModule_Create(&bqnmodule);
 }
 
-// gcc -shared -o bqn.so -g -fPIC bqn.c -I/home/mu6mula/miniconda3/envs/py310/include/python3.10 -I/home/mu6mula/miniconda3/envs/py310/lib/python3.10/site-packages/numpy/core/include -I/media/mu6mula/Data/work/BQN/CBQN-dzaima/include -Wl,-rpath=/media/mu6mula/Data/work/BQN/CBQN-dzaima -lcbqn
+/*
+To Compile the extension on Linux run
 
+clear & rm ./bqn.so & gcc -shared -o bqn.so -g -fPIC bqn.c -I$HOME/miniconda3/envs/py310/include/python3.10 -I$HOME/miniconda3/envs/py310/lib/python3.10/site-packages/numpy/core/include -I/media/mu6mula/Data/work/BQN/CBQN-dzaima/include -Wl,-rpath=/media/mu6mula/Data/work/BQN/CBQN-dzaima -lcbqn
+
+*/
 
 // export LD_LIBRARY_PATH=/media/mu6mula/Data/work/BQN/CBQN-dzaima:$LD_LIBRARY_PATH
