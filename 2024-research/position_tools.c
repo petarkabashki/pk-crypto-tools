@@ -152,10 +152,42 @@ static PyObject* calculate_positions(PyObject* self, PyObject* args) {
 }
 
 
+static PyObject* count_since_last_signal(PyObject* self, PyObject* args) {
+    PyObject *signal_array_obj;
+    if (!PyArg_ParseTuple(args, "O!", &PyArray_Type, &signal_array_obj)) {
+        return NULL;
+    }
+
+    PyArrayObject *signal_array = (PyArrayObject*) signal_array_obj;
+    npy_intp n = PyArray_DIM(signal_array, 0);
+    npy_bool *signals = (npy_bool*)PyArray_DATA(signal_array); // Use npy_bool for boolean array
+
+    // Create a new NumPy array for the result
+    PyArrayObject *result_array = (PyArrayObject*)PyArray_SimpleNew(1, PyArray_DIMS(signal_array), NPY_INT);
+    int *result = (int*)PyArray_DATA(result_array);
+
+    // Initialize the last_signal_index to -1 (no signal found yet)
+    int last_signal_index = -1;
+
+    for (npy_intp i = 0; i < n; ++i) {
+        if (signals[i]) {  // If the signal is True
+            last_signal_index = i;
+        }
+        if (last_signal_index == -1) {
+            result[i] = -1;  // No signal found yet
+        } else {
+            result[i] = i - last_signal_index;
+        }
+    }
+    return Py_BuildValue("O", result_array);
+}
+
 // Define the methods for the module
 static PyMethodDef PositionToolsMethods[] = {
     {"calculate_trades", calculate_trades, METH_VARARGS, "Calculate trades (entry index, exit index, and position type) from entry/exit masks"},
     {"calculate_positions", calculate_positions, METH_VARARGS, "Calculate positions from itrades"},
+    {"count_since_last_signal", count_since_last_signal, METH_VARARGS, "Count elements since last signal."},
+
     {NULL, NULL, 0, NULL}
 };
 
