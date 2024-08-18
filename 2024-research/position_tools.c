@@ -99,17 +99,26 @@ static PyObject* calculate_trades(PyObject* self, PyObject* args) {
 }
 
 static PyObject* calculate_positions(PyObject* self, PyObject* args) {
-    PyObject* itrades_obj;
-    int price_data_length;
+    PyObject* itrades_obj, *log_price_array;
+    // int price_data_length;
 
     // Parse the input arguments: itrades array and the length of the price data array
-    if (!PyArg_ParseTuple(args, "O!i", &PyArray_Type, &itrades_obj, &price_data_length)) {
+    if (!PyArg_ParseTuple(args, "O!O!", 
+            &PyArray_Type, &itrades_obj, 
+            &PyArray_Type, &log_price_array
+        )) {
         return NULL;
     }
 
     // Ensure itrades is indeed a NumPy array
     if (!PyArray_Check(itrades_obj)) {
         PyErr_SetString(PyExc_TypeError, "Expected a NumPy array for itrades");
+        return NULL;
+    }
+
+    // Ensure itrades is indeed a NumPy array
+    if (!PyArray_Check(log_price_array)) {
+        PyErr_SetString(PyExc_TypeError, "Expected a NumPy array for log prices");
         return NULL;
     }
 
@@ -120,35 +129,62 @@ static PyObject* calculate_positions(PyObject* self, PyObject* args) {
     // Get pointers to the data of itrades
     int* itrades_data = (int*)PyArray_DATA((PyArrayObject*)itrades_obj);
 
-    // Create an array of positions initialized to 0
-    npy_intp dims[1] = {price_data_length};
-    PyObject* positions_array = PyArray_SimpleNew(1, dims, NPY_INT);
 
-    if (positions_array == NULL) {
+    // Get the shape of the itrades array
+    npy_intp* log_prices_shape = PyArray_SHAPE((PyArrayObject*)log_price_array);
+    npy_intp num_log_prices = log_prices_shape[0];
+
+    // Get pointers to the data of itrades
+    double* log_prices_data = (double*)PyArray_DATA((PyArrayObject*)log_price_array);
+
+    // Create an array of unrealized initialized to 0
+    npy_intp dims[1] = {num_log_prices};
+    PyObject* unrealized_array = PyArray_SimpleNew(1, dims, NPY_DOUBLE);
+
+    if (unrealized_array == NULL) {
+        PyErr_SetString(PyExc_TypeError, "Error creating the unrealized array.");
         return NULL;
     }
+    double* unrealized_data = (double*)PyArray_DATA((PyArrayObject*)unrealized_array);
 
-    int* positions_data = (int*)PyArray_DATA((PyArrayObject*)positions_array);
-
-    // Initialize the positions array to 0
-    for (int i = 0; i < price_data_length; i++) {
-        positions_data[i] = 0;
+    // Initialize the unrealized array to 0
+    for (int i = 0; i < num_log_prices; i++) {
+        unrealized_data[i] = 0;
     }
 
-    // Fill the positions array based on itrades
+    // Fill the unrealized array based on itrades
+    double unrealized_total = 0;
     for (npy_intp i = 0; i < num_trades; i++) {
         int start_index = itrades_data[i * 3];
         int end_index = itrades_data[i * 3 + 1];
         int position_type = itrades_data[i * 3 + 2];
-
+        
+        // double start_trade_log_price = log_prices_data[start_index];
+        // double start_pos_log_price = 0;
+        unrealized_data[start_index] = unrealized_total;
+        // unrealized_total -= (log_prices_data[start_index] * position_type);
         // Set positions from start_index to end_index with position_type
-        for (int j = start_index+1; j <= end_index && j < price_data_length; j++) {
-            positions_data[j] = position_type;
+        for (int j = start_index + 1; j <= end_index - 1; j++) {
+            unrealized_data[j] = unrealized_total + (( log_prices_data[j] - log_prices_data[start_index])* position_type) ;
         }
+        unrealized_total += ((log_prices_data[end_index] - log_prices_data[start_index])* position_type);
+        unrealized_data[end_index] = unrealized_total;
     }
 
+    // fill unrealized between trades
+    for (npy_intp i = 1; i < num_trades; i++) {
+        int end_prev_index = itrades_data[(i-1) * 3 + 1];
+        int start_index = itrades_data[i * 3];
+        for (int j = end_prev_index+1; j <= start_index-1; j++) {
+            unrealized_data[j] = unrealized_data[end_prev_index];
+        }    
+    }
+    int end_last_trade_index = itrades_data[(num_trades-1) * 3 + 1];
+    for (int j = end_last_trade_index + 1; j <= num_log_prices - 1; j++) {
+        unrealized_data[j] = unrealized_data[end_last_trade_index];
+    }  
     // Return the positions array
-    return positions_array;
+    return Py_BuildValue("O", unrealized_array);
 }
 
 
