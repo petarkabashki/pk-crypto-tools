@@ -2,6 +2,12 @@
 #include <numpy/arrayobject.h>
 
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+
+double round_down(double value, int decimal_places) {
+    double factor = pow(10.0, decimal_places);
+    return floor(value * factor) / factor;
+}
+
 // C function to calculate trades (entry, exit indices, and position type)
 static PyObject* calculate_trades(PyObject* self, PyObject* args) {
     PyArrayObject *long_entry_mask, *long_exit_mask, *short_entry_mask, *short_exit_mask;
@@ -98,47 +104,44 @@ static PyObject* calculate_trades(PyObject* self, PyObject* args) {
     return Py_BuildValue("O", trade_details);
 }
 
-static PyObject* calculate_positions(PyObject* self, PyObject* args) {
-    PyObject* itrades_obj, *log_price_array;
-    // int price_data_length;
+static PyObject* calculate_positions(PyObject* self, PyObject* args, PyObject* kwargs) {
+   PyArrayObject *itrades_array = NULL;
+    PyArrayObject *log_prices_array = NULL;
+    double precision = 3;
+    double slippage = 0.001;
+    double transaction_cost = 0.001;
 
-    // Parse the input arguments: itrades array and the length of the price data array
-    if (!PyArg_ParseTuple(args, "O!O!", 
-            &PyArray_Type, &itrades_obj, 
-            &PyArray_Type, &log_price_array
-        )) {
+    static char *kwlist[] = {"itrades", "log_prices", "precision", "slippage", "transaction_cost", NULL};
+
+    // Parse the arguments
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!|ddd", kwlist,
+                                     &PyArray_Type, &itrades_array,
+                                     &PyArray_Type, &log_prices_array,
+                                     &precision, &slippage, &transaction_cost)) {
         return NULL;
     }
 
-    // Ensure itrades is indeed a NumPy array
-    if (!PyArray_Check(itrades_obj)) {
-        PyErr_SetString(PyExc_TypeError, "Expected a NumPy array for itrades");
+    // Ensure that itrades is of type int32 and is 2D with shape (n_itrades, 3)
+    if (PyArray_TYPE(itrades_array) != NPY_INT32 || PyArray_NDIM(itrades_array) != 2 || PyArray_DIM(itrades_array, 1) != 3) {
+        PyErr_SetString(PyExc_TypeError, "itrades must be a 2D NumPy array of int32 with shape (n_itrades, 3)");
         return NULL;
     }
 
-    // Ensure itrades is indeed a NumPy array
-    if (!PyArray_Check(log_price_array)) {
-        PyErr_SetString(PyExc_TypeError, "Expected a NumPy array for log prices");
+    // Ensure that log_prices is of type float64 and is 1D
+    if (PyArray_TYPE(log_prices_array) != NPY_FLOAT64 || PyArray_NDIM(log_prices_array) != 1) {
+        PyErr_SetString(PyExc_TypeError, "log_prices must be a 1D NumPy array of float64");
         return NULL;
     }
 
-    // Get the shape of the itrades array
-    npy_intp* itrades_shape = PyArray_SHAPE((PyArrayObject*)itrades_obj);
-    npy_intp num_trades = itrades_shape[0];
+    // Get pointers to the data
+    npy_int32* itrades_data = (npy_int32*)PyArray_DATA(itrades_array);
+    npy_float64* log_prices_data = (npy_float64*)PyArray_DATA(log_prices_array);
 
-    // Get pointers to the data of itrades
-    int* itrades_data = (int*)PyArray_DATA((PyArrayObject*)itrades_obj);
-
-
-    // Get the shape of the itrades array
-    npy_intp* log_prices_shape = PyArray_SHAPE((PyArrayObject*)log_price_array);
-    npy_intp num_log_prices = log_prices_shape[0];
-
-    // Get pointers to the data of itrades
-    double* log_prices_data = (double*)PyArray_DATA((PyArrayObject*)log_price_array);
+    npy_intp n_itrades = PyArray_DIM(itrades_array, 0);  // Number of trades (rows)
+    npy_intp n_logprices = PyArray_SIZE(log_prices_array); // Number of log prices
 
     // Create an array of unrealized initialized to 0
-    npy_intp dims[1] = {num_log_prices};
+    npy_intp dims[1] = {n_logprices};
     PyObject* unrealized_array = PyArray_SimpleNew(1, dims, NPY_DOUBLE);
 
     if (unrealized_array == NULL) {
@@ -148,13 +151,13 @@ static PyObject* calculate_positions(PyObject* self, PyObject* args) {
     double* unrealized_data = (double*)PyArray_DATA((PyArrayObject*)unrealized_array);
 
     // Initialize the unrealized array to 0
-    for (int i = 0; i < num_log_prices; i++) {
+    for (int i = 0; i < n_logprices; i++) {
         unrealized_data[i] = 0;
     }
 
     // Fill the unrealized array based on itrades
     double unrealized_total = 0;
-    for (npy_intp i = 0; i < num_trades; i++) {
+    for (npy_intp i = 0; i < n_itrades; i++) {
         int start_index = itrades_data[i * 3];
         int end_index = itrades_data[i * 3 + 1];
         int position_type = itrades_data[i * 3 + 2];
@@ -165,22 +168,22 @@ static PyObject* calculate_positions(PyObject* self, PyObject* args) {
         // unrealized_total -= (log_prices_data[start_index] * position_type);
         // Set positions from start_index to end_index with position_type
         for (int j = start_index + 1; j <= end_index - 1; j++) {
-            unrealized_data[j] = unrealized_total + (( log_prices_data[j] - log_prices_data[start_index])* position_type) ;
+            unrealized_data[j] = unrealized_total + round_down((( log_prices_data[j] - log_prices_data[start_index])* position_type - 2*(transaction_cost + slippage)) , precision);
         }
-        unrealized_total += ((log_prices_data[end_index] - log_prices_data[start_index])* position_type);
+        unrealized_total += round_down(((log_prices_data[end_index] - log_prices_data[start_index])* position_type - 2*(transaction_cost + slippage) ),3);
         unrealized_data[end_index] = unrealized_total;
     }
 
     // fill unrealized between trades
-    for (npy_intp i = 1; i < num_trades; i++) {
+    for (npy_intp i = 1; i < n_itrades; i++) {
         int end_prev_index = itrades_data[(i-1) * 3 + 1];
         int start_index = itrades_data[i * 3];
         for (int j = end_prev_index+1; j <= start_index-1; j++) {
             unrealized_data[j] = unrealized_data[end_prev_index];
         }    
     }
-    int end_last_trade_index = itrades_data[(num_trades-1) * 3 + 1];
-    for (int j = end_last_trade_index + 1; j <= num_log_prices - 1; j++) {
+    int end_last_trade_index = itrades_data[(n_itrades-1) * 3 + 1];
+    for (int j = end_last_trade_index + 1; j <= n_logprices - 1; j++) {
         unrealized_data[j] = unrealized_data[end_last_trade_index];
     }  
     // Return the positions array
