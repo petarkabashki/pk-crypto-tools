@@ -246,5 +246,6 @@ PyMODINIT_FUNC PyInit_position_tools(void) {
 }
 
 
+// f'gcc -shared -o positions.so -fPIC positions.c -I{sysconfig.get_path("include")} -I{np.get_include()}'
 
 // clear & rm position_tools.so & gcc -shared -o position_tools.so -fPIC position_tools.c -I/home/mu6mula/miniconda3/envs/py310/include/python3.10 -I/home/mu6mula/miniconda3/envs/py310/include/python3.10 -I/home/mu6mula/miniconda3/envs/py310/lib/python3.10/site-packages/numpy/core/include

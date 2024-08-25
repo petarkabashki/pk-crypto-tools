@@ -110,3 +110,5 @@ PyMODINIT_FUNC PyInit_pkindicators(void) {
     import_array();
     return PyModule_Create(&pkindicatorsmodule);
 }
+
+// f'gcc -shared -o positions.so -fPIC positions.c -I{sysconfig.get_path("include")} -I{np.get_include()}'
