@@ -1,8 +1,16 @@
 
 import pandas as pd
 import numpy as np
-import position_tools  # Import the C extension module
 import optuna
+import os
+import sys
+import matplotlib.pyplot as plt
+
+# Dynamically add the current module's directory to sys.path
+module_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, module_dir)
+
+import position_tools
 
 
 def backtest(data, params, indicators, signals, enable_long=True, enable_short=True, xmult=1, transaction_cost=0.001, slippage=0.003, precision=3, period_costs=None):
@@ -359,15 +367,9 @@ def optimize(data, param_defs, indicators, signals, enable_long=True, enable_sho
     return study
 
 
-def plot_performance(data, asset, params, indicators, signals, enable_long=True, enable_short=True, reset_index=False, title='', btkwargs={}):
-    if reset_index:
-        data = data.copy().reset_index(drop=True)
+def plot_performance(metrics, data, asset, params, indicators, signals, enable_long=True, enable_short=True):
     
-    # Run backtest with the provided parameters and keyword arguments
-    metrics = backtest(data, params, indicators, signals, enable_long=enable_long, enable_short=enable_short)
     
-    # Print the metrics table
-    # print_metrics_table(metrics, convert_to_pct=True)
     itrades = metrics['itrades']
 
     if itrades is None or len(itrades) == 0:
@@ -400,11 +402,9 @@ def plot_performance(data, asset, params, indicators, signals, enable_long=True,
         short_pnl_pct = pd.Series([0] * len(data)).subtract(1).set_axis(data.index)
 
     # Plot the results with the best parameters
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 10), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
-    fig.suptitle(f'{title} / {asset} ', fontsize=16)
 
-    # Plot the indicators
-    # plot_indicators(ax1, data)
+    
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 10), sharex=True, height_ratios=[2,1])
 
     # Plot PnL as percentage for long, short, and combined
     ax2.axhline(0, color='black', lw=1)  # Baseline for percentage returns
@@ -431,4 +431,4 @@ def plot_performance(data, asset, params, indicators, signals, enable_long=True,
     
     ax2.grid(axis='y')
     # plt.show()
-    return fig, metrics
+    return fig

@@ -1,0 +1,152 @@
+import 'lib2/json'.
+import io.
+import math.
+
+% export PICATPATH=/media/mu6mula/Data/work/picat/Picat368/lib2:/media/mu6mula/Data/work/picat/Picat368/lib
+% export PATH=$PATH:/media/mu6mula/Data/work/picat/Picat368
+% cl('donchian').
+
+main =>
+    % Specify parameters for loading the data
+    
+    Exchange = "binance",
+    Base = "BTC",
+    Quote = "USDT",
+    Timeframe = "8h",
+    % Load the candlestick data
+    OHLCV = load_candles(Exchange, Base, Quote, Timeframe, 1000, 5000),
+    Len = len(OHLCV),
+    
+    % Define the parameter for the Donchian Channels
+    LBackP_Up = 96,
+    LagP_Up = 17,
+    LBackP_Dn = 56,
+    LagP_Dn = 17,
+    Skip = max([LBackP_Up,LBackP_Dn,LagP_Up,LagP_Dn]),
+
+    % Extract the necessary fields from OHLCV data
+    BandOffset = 0.4530,  % You can set this between 0 and 1
+
+    Highs = [Row[3] : Row in OHLCV],
+    Lows = [Row[4] : Row in OHLCV],
+    Closes = [Row[5] : Row in OHLCV],
+    LogPrices = [log(Close) : Close in Closes],
+
+    % Calculate the log returns
+    LogReturns = [0]++[LogPrices[I] - LogPrices[I-1] : I in 2..len(LogPrices)],
+
+    RollingMax = rolling_max(Highs, LBackP_Up),
+    % printf("RollingMax: %w\n", [RollingMax[I]: I in Skip..Len]),
+
+    % % Calculate the Donchian Channels
+    UpperBand = calculate_upper_band(Highs, LBackP_Up, LagP_Up),
+    LowerBand = calculate_lower_band(Lows, LBackP_Dn, LagP_Dn),
+    % printf("UpperBand: %w\n", [UpperBand[I]: I in Skip..Len]),
+    % printf("LowerBand: %w\n", [LowerBand[I]: I in Skip..Len]),
+    % MidBand = calculate_mid_band(UpperBand, LowerBand, BandOffset),
+    % Band = zip(UpperBand, LowerBand),
+    MidBand = new_list(Skip,0) ++ [(1 - BandOffset) * UpperBand[I] + BandOffset * LowerBand[I] : I in Skip + 1..Len],
+
+    % printf("MidBand: %w\n", [MidBand[I]: I in Skip..Len]),
+
+    LongEnterSignals = new_list(Skip,0) ++ 
+                  [above(Closes[I], UpperBand[I]) : I in Skip+1..len(UpperBand)],
+    LongExitSignals = new_list(Skip,0)  ++ 
+                      [above(MidBand[I], Closes[I]) : I in Skip+1..len(MidBand)],
+
+    ShortEnterSignals = new_list(Skip,0)  ++ 
+                   [above(LowerBand[I], Closes[I]) : I in Skip+1..len(LowerBand)],
+    ShortExitSignals = new_list(Skip,0)  ++ 
+                       [above(Closes[I], MidBand[I]) : I in Skip+1..len(MidBand)],
+
+    % printf("LongEnterSignals: %d\n", sum(LongEnterSignals)),
+    % printf("ShortEnterSignals: %d\n", sum(ShortEnterSignals)),
+    % printf("LongExitSignals: %d\n", sum(LongExitSignals)),
+    % printf("ShortExitSignals: %d\n", sum(ShortExitSignals)),
+
+    % Generate positions
+    % LongPositions = populate_positions(LongEnterSignals, LongExitSignals, Skip),
+    % ShortPositions = populate_positions(ShortEnterSignals, ShortExitSignals, Skip),
+    LongPositions = new_list(Skip,0) ++ [LongEnterSignals[I] * (1 - LongExitSignals[I]) : I in Skip+1..Len],
+    ShortPositions = new_list(Skip,0) ++ [-ShortEnterSignals[I] * (1 - ShortExitSignals[I]) : I in Skip+1..Len],
+
+    % printf("LongPositions: %w\n", [LongPositions[I]: I in Skip..Len]),
+    % printf("ShortPositions: %w\n", [ShortPositions[I]: I in Skip..Len]),
+    % Calculate returns for both long and short positions
+    % LongReturns = calculate_returns(LongPositions, LogReturns),
+    % ShortReturns = calculate_returns(ShortPositions, LogReturns),
+
+    LongReturns = new_list(Skip,0)++[LongPositions[I] * LogReturns[I] : I in Skip+1..Len],
+    ShortReturns = new_list(Skip,0)++[ShortPositions[I] * LogReturns[I] : I in Skip+1..Len],
+
+    % Calculate total return by summing long and short returns
+    TotalReturn = sum(LongReturns) + sum(ShortReturns),
+    CombinedReturns = [LongReturns[I] + ShortReturns[I] : I in 1..Len],
+
+    % Output the results for verification
+    % printf("LongPositions: %w\n", LongPositions),
+    % printf("ShortPositions: %w\n", ShortPositions),
+    % printf("LongReturns: %w\n", LongReturns),
+    % printf("ShortReturns: %w\n", ShortReturns),
+    % printf("CombinedReturns: %w\n", CombinedReturns),
+    printf("TotalReturn: %f\n", TotalReturn)
+    
+    .
+
+% Function to load candlestick data
+load_candles(Exchange, Base, Quote, Timeframe, From, To) = Candles =>
+% load_candles(Base) = Candles =>
+    % Construct the file name
+    FileName = "/media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data/" ++ Exchange ++ "/" ++ Base ++ "_" ++ Quote ++ "-" ++ Timeframe ++ ".json",
+    S = read_file_chars(FileName),
+    AllCandles = json_decode(S),
+    Candles = [AllCandles[I] : I in From..To]
+    .
+
+% Predicate to calculate the upper band of Donchian Channels with lagging
+calculate_upper_band(Highs, LBackP_Up, Lag) = UpperBand =>
+    RollingMax = rolling_max(Highs, LBackP_Up),
+    LaggedRollingMax = lag_list(RollingMax, Lag),
+    UpperBand = pad_list(LaggedRollingMax, len(Highs), 0).
+
+% Predicate to calculate the lower band of Donchian Channels with lagging
+calculate_lower_band(LowPrices, LBackP_Up, Lag) = LowerBand =>
+    RollingMin = rolling_min(LowPrices, LBackP_Up),
+    LaggedRollingMin = lag_list(RollingMin, Lag),
+    LowerBand = pad_list(LaggedRollingMin, len(LowPrices), 0).
+
+% Function to calculate the rolling maximum over a specified period with zero padding
+rolling_max(List, Period) = PaddedResult =>
+    Len = len(List),
+    RollingMax = [max([List[J] : J in I..I+Period-1]) : I in 1..Len-Period+1],
+    Padding = new_list(Period-1, 0),
+    PaddedResult = Padding ++ RollingMax.
+
+% Function to calculate the rolling minimum over a specified period with zero padding
+rolling_min(List, Period) = PaddedResult =>
+    Len = len(List),
+    RollingMin = [min([List[J] : J in I..I+Period-1]) : I in 1..Len-Period+1],
+    Padding = new_list(Period-1, 0),
+    PaddedResult = Padding ++ RollingMin.
+
+% Function to lag a list by a specified number of periods
+lag_list(List, Lag) = LaggedList =>
+    Padding = new_list(Lag, 0),
+    LaggedList = Padding ++ List[1..len(List)-Lag].
+
+% Function to pad a list to a specified length with a given value
+pad_list(List, TargetLength, PaddingValue) = PaddedList =>
+    % printf("len(list): %d\n", len(List)),
+    % printf("TargetLength: %d\n", TargetLength),
+    PaddingLength = TargetLength - len(List),
+    Padding = new_list(PaddingLength, PaddingValue),
+    PaddedList = List ++ Padding.
+
+
+% Function to generate a signal based on a condition
+above(Value1, Value2) = cond(Value1 > Value2, 1, 0).
+% above(Value1, Value2) = F, Value1 <= Value2 => F = 0.
+
+% Function to calculate the mid band based on the upper band, lower band, and a band offset
+calculate_mid_band(UpperBand, LowerBand, BandOffset) = MidBand =>
+    MidBand = [(1 - BandOffset) * Upper + BandOffset * Lower : (Upper, Lower) in zip(UpperBand, LowerBand)].
