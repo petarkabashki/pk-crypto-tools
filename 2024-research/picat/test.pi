@@ -1,0 +1,18 @@
+
+import sys.
+import io.
+import math.
+import util.
+
+% export PICATPATH=/media/mu6mula/Data/work/picat/Picat368/lib2:/media/mu6mula/Data/work/picat/Picat368/lib
+% export PATH=$PATH:/media/mu6mula/Data/work/picat/Picat368
+% cl('test'), main.
+
+main =>
+    LogPrices = 1..10,
+    Pos = [1,1,1,0,0,1,1,1,0,1]
+
+    writeln(LogPrices)
+
+
+.

@@ -8,186 +8,62 @@ double round_down(double value, int decimal_places) {
     return floor(value * factor) / factor;
 }
 
-// C function to calculate trades (entry, exit indices, and position type)
-static PyObject* calculate_trades(PyObject* self, PyObject* args) {
-    PyArrayObject *long_entry_mask, *long_exit_mask, *short_entry_mask, *short_exit_mask;
-    int length;
-    npy_intp dims[1];
 
-    // Parse Python arguments (four arrays)
-    if (!PyArg_ParseTuple(args, "O!O!O!O!",
-                          &PyArray_Type, &long_entry_mask,
-                          &PyArray_Type, &long_exit_mask,
-                          &PyArray_Type, &short_entry_mask,
-                          &PyArray_Type, &short_exit_mask))
+// C function to calculate trades (entry, exit indices)
+static PyObject* enumerate_trades(PyObject* self, PyObject* args) {
+    PyArrayObject *entry_mask, *exit_mask;
+    int length, skip_first;
+
+    // Parse Python arguments (two arrays and an integer)
+    if (!PyArg_ParseTuple(args, "O!O!i",
+                          &PyArray_Type, &entry_mask,
+                          &PyArray_Type, &exit_mask,
+                          &skip_first))
         return NULL;
 
     // Ensure input arrays are of the same length
-    length = (int)PyArray_DIM(long_entry_mask, 0);
-    if (length != PyArray_DIM(long_exit_mask, 0) ||
-        length != PyArray_DIM(short_entry_mask, 0) ||
-        length != PyArray_DIM(short_exit_mask, 0)) {
+    length = (int)PyArray_DIM(entry_mask, 0);
+    if (length != PyArray_DIM(exit_mask, 0)) {
         PyErr_SetString(PyExc_ValueError, "All input arrays must have the same length");
         return NULL;
     }
 
-    // Create output array for positions
-    dims[0] = length;
-    PyObject *positions = PyArray_SimpleNew(1, dims, NPY_INT);
-    int *pos = (int *)PyArray_DATA(positions);
+    // Ensure skip_first is within valid range
+    if (skip_first >= length || skip_first < 0) {
+        PyErr_SetString(PyExc_ValueError, "skip_first must be a non-negative integer less than the length of the arrays");
+        return NULL;
+    }
 
-    // Initialize the position state and trade details
+    // Initialize pointers for the input arrays
+    long *entry_data = (long *)PyArray_DATA(entry_mask);
+    long *exit_data = (long *)PyArray_DATA(exit_mask);
+
+    // Dynamic arrays to hold entry and exit indices as Python lists
+    PyObject *entry_list = PyList_New(0);
+    PyObject *exit_list = PyList_New(0);
+
     int current_position = 0;
-    int entry_index = -1;
-    int trade_count = 0;
-
-    // Estimate maximum number of trades (this is a conservative estimate)
-    int max_trades = length / 2;
-
-    // Allocate array for trade details (entry index, exit index, and position type)
-    npy_intp trade_dims[2] = {max_trades, 3};  // Three columns: entry_index, exit_index, position_type
-    PyObject *trade_details = PyArray_SimpleNew(2, trade_dims, NPY_INT);
-    int *trade_data = (int *)PyArray_DATA(trade_details);
 
     // Loop through the array to calculate positions and trade details
-    for (int i = 0; i < length; i++) {
-        // Handle closing of the current position
-        if (current_position == 1 && (*((int *)PyArray_GETPTR1(short_entry_mask, i)) || *((int *)PyArray_GETPTR1(long_exit_mask, i)))) {
-            // Close the long position
-            trade_data[trade_count * 3] = entry_index;
-            trade_data[trade_count * 3 + 1] = i;
-            trade_data[trade_count * 3 + 2] = 1;
-            trade_count++;
+    for (int i = skip_first; i < length; i++) {
+        if (current_position == 1 && exit_data[i] == 1) {
+            // Close the position
+            PyList_Append(exit_list, PyLong_FromLong(i));
             current_position = 0;
-            entry_index = -1;
-        } else if (current_position == -1 && (*((int *)PyArray_GETPTR1(long_entry_mask, i)) || *((int *)PyArray_GETPTR1(short_exit_mask, i)))) {
-            // Close the short position
-            trade_data[trade_count * 3] = entry_index;
-            trade_data[trade_count * 3 + 1] = i;
-            trade_data[trade_count * 3 + 2] = -1;
-            trade_count++;
-            current_position = 0;
-            entry_index = -1;
+        } else if (current_position == 0 && entry_data[i] == 1) {
+            // Open a new position
+            PyList_Append(entry_list, PyLong_FromLong(i));
+            current_position = 1;
         }
-
-        // Handle opening of a new position
-        if (current_position == 0) {
-            if (*((int *)PyArray_GETPTR1(long_entry_mask, i))) {
-                // Open a long position
-                current_position = 1;
-                entry_index = i;
-            } else if (*((int *)PyArray_GETPTR1(short_entry_mask, i))) {
-                // Open a short position
-                current_position = -1;
-                entry_index = i;
-            }
-        }
-
-        pos[i] = current_position;
     }
 
-    // Resize the trade_details array to match the actual number of trades
-    if (trade_count < max_trades) {
-        npy_intp new_dims[2] = {trade_count, 3};
-        PyObject *new_trade_details = PyArray_SimpleNew(2, new_dims, NPY_INT);
-        int *new_trade_data = (int *)PyArray_DATA(new_trade_details);
-        for (int j = 0; j < trade_count; j++) {
-            new_trade_data[j * 3] = trade_data[j * 3];
-            new_trade_data[j * 3 + 1] = trade_data[j * 3 + 1];
-            new_trade_data[j * 3 + 2] = trade_data[j * 3 + 2];
-        }
-        Py_DECREF(trade_details);
-        trade_details = new_trade_details;
+    // If we have more entries than exits, assume the last data point is the exit
+    if (PyList_Size(entry_list) > PyList_Size(exit_list)) {
+        PyList_Append(exit_list, PyLong_FromLong(length - 1));
     }
 
-    // Return the trade details (entry index, exit index, and position type)
-    return Py_BuildValue("O", trade_details);
-}
-
-static PyObject* calculate_positions(PyObject* self, PyObject* args, PyObject* kwargs) {
-   PyArrayObject *itrades_array = NULL;
-    PyArrayObject *log_prices_array = NULL;
-    double precision = 3;
-    double slippage = 0.001;
-    double transaction_cost = 0.001;
-
-    static char *kwlist[] = {"itrades", "log_prices", "precision", "slippage", "transaction_cost", NULL};
-
-    // Parse the arguments
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!|ddd", kwlist,
-                                     &PyArray_Type, &itrades_array,
-                                     &PyArray_Type, &log_prices_array,
-                                     &precision, &slippage, &transaction_cost)) {
-        return NULL;
-    }
-
-    // Ensure that itrades is of type int32 and is 2D with shape (n_itrades, 3)
-    if (PyArray_TYPE(itrades_array) != NPY_INT32 || PyArray_NDIM(itrades_array) != 2 || PyArray_DIM(itrades_array, 1) != 3) {
-        PyErr_SetString(PyExc_TypeError, "itrades must be a 2D NumPy array of int32 with shape (n_itrades, 3)");
-        return NULL;
-    }
-
-    // Ensure that log_prices is of type float64 and is 1D
-    if (PyArray_TYPE(log_prices_array) != NPY_FLOAT64 || PyArray_NDIM(log_prices_array) != 1) {
-        PyErr_SetString(PyExc_TypeError, "log_prices must be a 1D NumPy array of float64");
-        return NULL;
-    }
-
-    // Get pointers to the data
-    npy_int32* itrades_data = (npy_int32*)PyArray_DATA(itrades_array);
-    npy_float64* log_prices_data = (npy_float64*)PyArray_DATA(log_prices_array);
-
-    npy_intp n_itrades = PyArray_DIM(itrades_array, 0);  // Number of trades (rows)
-    npy_intp n_logprices = PyArray_SIZE(log_prices_array); // Number of log prices
-
-    // Create an array of unrealized initialized to 0
-    npy_intp dims[1] = {n_logprices};
-    PyObject* unrealized_array = PyArray_SimpleNew(1, dims, NPY_DOUBLE);
-
-    if (unrealized_array == NULL) {
-        PyErr_SetString(PyExc_TypeError, "Error creating the unrealized array.");
-        return NULL;
-    }
-    double* unrealized_data = (double*)PyArray_DATA((PyArrayObject*)unrealized_array);
-
-    // Initialize the unrealized array to 0
-    for (int i = 0; i < n_logprices; i++) {
-        unrealized_data[i] = 0;
-    }
-
-    // Fill the unrealized array based on itrades
-    double unrealized_total = 0;
-    for (npy_intp i = 0; i < n_itrades; i++) {
-        int start_index = itrades_data[i * 3];
-        int end_index = itrades_data[i * 3 + 1];
-        int position_type = itrades_data[i * 3 + 2];
-        
-        // double start_trade_log_price = log_prices_data[start_index];
-        // double start_pos_log_price = 0;
-        unrealized_data[start_index] = unrealized_total;
-        // unrealized_total -= (log_prices_data[start_index] * position_type);
-        // Set positions from start_index to end_index with position_type
-        for (int j = start_index + 1; j <= end_index - 1; j++) {
-            unrealized_data[j] = unrealized_total + round_down((( log_prices_data[j] - log_prices_data[start_index])* position_type - 2*(transaction_cost + slippage)) , precision);
-        }
-        unrealized_total += round_down(((log_prices_data[end_index] - log_prices_data[start_index])* position_type - 2*(transaction_cost + slippage) ),3);
-        unrealized_data[end_index] = unrealized_total;
-    }
-
-    // fill unrealized between trades
-    for (npy_intp i = 1; i < n_itrades; i++) {
-        int end_prev_index = itrades_data[(i-1) * 3 + 1];
-        int start_index = itrades_data[i * 3];
-        for (int j = end_prev_index+1; j <= start_index-1; j++) {
-            unrealized_data[j] = unrealized_data[end_prev_index];
-        }    
-    }
-    int end_last_trade_index = itrades_data[(n_itrades-1) * 3 + 1];
-    for (int j = end_last_trade_index + 1; j <= n_logprices - 1; j++) {
-        unrealized_data[j] = unrealized_data[end_last_trade_index];
-    }  
-    // Return the positions array
-    return Py_BuildValue("O", unrealized_array);
+    // Return the trade entries and exits as Python lists
+    return Py_BuildValue("OO", entry_list, exit_list);
 }
 
 
@@ -223,8 +99,7 @@ static PyObject* count_since_last_signal(PyObject* self, PyObject* args) {
 
 // Define the methods for the module
 static PyMethodDef PositionToolsMethods[] = {
-    {"calculate_trades", calculate_trades, METH_VARARGS, "Calculate trades (entry index, exit index, and position type) from entry/exit masks"},
-    {"calculate_positions", calculate_positions, METH_VARARGS, "Calculate positions from itrades"},
+    {"enumerate_trades", enumerate_trades, METH_VARARGS, "Calculate trades (entry index, exit index, and position type) from entry/exit masks"},
     {"count_since_last_signal", count_since_last_signal, METH_VARARGS, "Count elements since last signal."},
 
     {NULL, NULL, 0, NULL}
@@ -248,4 +123,4 @@ PyMODINIT_FUNC PyInit_position_tools(void) {
 
 // f'gcc -shared -o positions.so -fPIC positions.c -I{sysconfig.get_path("include")} -I{np.get_include()}'
 
-// clear & rm position_tools.so & gcc -shared -o position_tools.so -fPIC position_tools.c -I/home/mu6mula/miniconda3/envs/py310/include/python3.10 -I/home/mu6mula/miniconda3/envs/py310/include/python3.10 -I/home/mu6mula/miniconda3/envs/py310/lib/python3.10/site-packages/numpy/core/include
+// clear & rm position_tools.so & gcc -shared -o position_tools.so -fPIC position_tools.c -I/home/mu6mula/miniconda3/envs/py310/include/python3.10 -I/home/mu6mula/miniconda3/envs/py310/lib/python3.10/site-packages/numpy/core/include

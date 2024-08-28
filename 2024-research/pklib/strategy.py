@@ -13,78 +13,36 @@ sys.path.insert(0, module_dir)
 import position_tools
 
 
-def backtest(data, params, indicators, signals, enable_long=True, enable_short=True, xmult=1, transaction_cost=0.001, slippage=0.003, precision=3, period_costs=None):
-    lclose = data['close'].apply(np.log)
-
-    # Calculate indicators using params
-    for indicator in indicators:
-        indicator['function'](data, params)
-
-    # Generate signals using params
-    signal_arrays = {name: signal['function'](data, params) for name, signal in signals.items()}
-
-    # Initialize empty signals if long/short is disabled
-    if not enable_long:
-        signal_arrays['bull'] = np.zeros(len(data))
-        signal_arrays['bull_end'] = np.zeros(len(data))
-    
-    if not enable_short:
-        signal_arrays['bear'] = np.zeros(len(data))
-        signal_arrays['bear_end'] = np.zeros(len(data))
-
+def backtest(log_price, enter_sigs, exit_sigs, skip_first, xmult, transaction_cost=0.001, slippage=0.003, precision=3, period_costs=None):
+ 
     # Use the position_tools C extension for trade calculation
-    itrades = position_tools.calculate_trades(
-        signal_arrays['bull'].values if enable_long else np.zeros(data.shape[0]),
-        signal_arrays['bull_end'].values if enable_long else np.zeros(data.shape[0]),
-        signal_arrays['bear'].values if enable_short else np.zeros(data.shape[0]),
-        signal_arrays['bear_end'].values if enable_short else np.zeros(data.shape[0])
-    )
+    
+    entry_indices, exit_indices = position_tools.enumerate_trades(enter_sigs.values, exit_sigs.values, skip_first)
 
-    if len(itrades) == 0 or not itrades.any():
+    if len(entry_indices) == 0:
         print('No trades found.')
         return {}
 
     # Calculate trade returns using log prices
     trade_rets = pd.Series(
-        itrades[:, 2] * (lclose.iloc[itrades[:, 1]].values - lclose.iloc[itrades[:, 0]].values),
-        index=itrades[:, 1]
+        xmult * (log_price.iloc[exit_indices].values - log_price.iloc[entry_indices].values),
+        index=log_price.index[exit_indices]
     )
     trade_rets *= xmult
-    trade_rets -= np.log1p(transaction_cost + slippage)
+    trade_rets -= np.log1p(2*transaction_cost + slippage)
 
-    # Apply period costs if provided
-    if period_costs is not None:
-        if isinstance(period_costs, (int, float)):
-            trade_rets -= period_costs * (itrades[:, 1] - itrades[:, 0] + 1)
-        elif isinstance(period_costs, (np.ndarray, pd.Series)):
-            cost_array = pd.Series(period_costs, index=data.index)
-            trade_rets -= cost_array.reindex(itrades[:, 1]).fillna(0) * (itrades[:, 1] - itrades[:, 0] + 1)
-        else:
-            raise ValueError("period_costs should be either a single number or an array-like structure.")
+    metrics = calculate_metrics(trade_rets)
 
-    # Use the C extension to calculate positions
-    strat_pnl = pd.Series(position_tools.calculate_positions(itrades, lclose.values, precision, slippage, transaction_cost), index=data.index)
-
-    # Calculate metrics
-    long_metrics = calculate_metrics(itrades[itrades[:, 2] == 1], trade_rets)
-    short_metrics = calculate_metrics(itrades[itrades[:, 2] == -1], trade_rets)
-    overall_metrics = calculate_metrics(itrades, trade_rets)
-
-    return {
-        'long_metrics': long_metrics,
-        'short_metrics': short_metrics,
-        'overall_metrics': overall_metrics,
-        'itrades': itrades,
-        'strat_pnl_pct': strat_pnl,
-        'entry_points': data.index[itrades[:, 0]],
-        'exit_points': data.index[itrades[:, 1]],
-        'long_returns': long_metrics['returns'],
-        'short_returns': short_metrics['returns'],
-        'overall_returns': overall_metrics['returns'],
-        'long_cum_returns': long_metrics['cum_returns'],
-        'short_cum_returns': short_metrics['cum_returns'],
-        'overall_cum_returns': overall_metrics['cum_returns'],
-    }
+    return entry_indices, exit_indices, metrics
+    # return {
+    #     'metrics': metrics,
+    #     'itrades': itrades,
+    #     # 'strat_pnl_pct': strat_pnl,
+    #     # 'entry_points': log_price.index[itrades[:, 0]],
+    #     # 'exit_points': log_price.index[itrades[:, 1]],
+    #     # 'returns': metrics['returns'],
+    #     # 'cum_returns': metrics['cum_returns'],
+    # }
 
 
 # Define helper functions for calculating metrics
@@ -101,8 +59,8 @@ def calculate_sortino_ratio(rets):
     downside_rets = rets[rets < 0]
     return rets.mean() / downside_rets.std() if downside_rets.std() > 0 else 0
 
-def calculate_metrics(trades, trade_rets):
-    if len(trades) == 0:
+def calculate_metrics(trade_rets):
+    if len(trade_rets) == 0:
         return {metric: 0 for metric in [
             'tot_return', 'avg_return', 'avg_win', 'avg_loss',
             'win_ratio', 'profit_factor', 'n_trades', 'n_wins',
@@ -112,52 +70,52 @@ def calculate_metrics(trades, trade_rets):
             'avg_periods_in_trades', 'returns', 'cum_returns'
         ]}
 
-    rets = trade_rets.reindex(trades[:, 1]).dropna()
+    # rets = trade_rets.reindex(trades[:, 1]).dropna()
 
-    total_return = rets.sum()
-    avg_return = rets.mean()
+    total_return = trade_rets.sum()
+    avg_return = trade_rets.mean()
 
-    wins = rets[rets > 0]
-    losses = rets[rets <= 0]
+    wins = trade_rets[trade_rets > 0]
+    losses = trade_rets[trade_rets <= 0]
 
     avg_win = wins.mean() if len(wins) > 0 else 0
     avg_loss = losses.mean() if len(losses) > 0 else 0
     max_win = wins.max() if len(wins) > 0 else 0
     max_loss = losses.min() if len(losses) > 0 else 0
 
-    win_ratio = len(wins) / len(rets) if len(rets) > 0 else 0
+    win_ratio = len(wins) / len(trade_rets) if len(trade_rets) > 0 else 0
     profit_factor = wins.sum() / abs(losses.sum()) if abs(losses.sum()) > 0 else np.nan
-    n_trades = int(len(rets))
+    n_trades = int(len(trade_rets))
     n_wins = int(len(wins))
     n_losses = int(len(losses))
 
     # Calculate cumulative returns and drawdowns
-    cum_rets = rets.cumsum()
+    cum_rets = trade_rets.cumsum()
     running_max = cum_rets.cummax()
     drawdowns = cum_rets - running_max
     max_drawdown = drawdowns.min()
     avg_drawdown = drawdowns.mean()
 
     # Calculate the number of periods for each trade
-    periods_in_trades = trades[:, 1] - trades[:, 0] + 1  # periods in each trade
+    # periods_in_trades = trades[:, 1] - trades[:, 0] + 1  # periods in each trade
 
     # Calculate periods metrics
-    win_indices = wins.index.values
-    loss_indices = losses.index.values
+    # win_indices = wins.index.values
+    # loss_indices = losses.index.values
 
     # Safely handle periods in trades by using valid indices
-    win_period_indices = [i for i, end_idx in enumerate(trades[:, 1]) if end_idx in win_indices]
-    loss_period_indices = [i for i, end_idx in enumerate(trades[:, 1]) if end_idx in loss_indices]
+    # win_period_indices = [i for i, end_idx in enumerate(trades[:, 1]) if end_idx in win_indices]
+    # loss_period_indices = [i for i, end_idx in enumerate(trades[:, 1]) if end_idx in loss_indices]
 
-    sum_periods_in_wins = np.sum(periods_in_trades[win_period_indices]) if len(win_period_indices) > 0 else 0
-    sum_periods_in_losses = np.sum(periods_in_trades[loss_period_indices]) if len(loss_period_indices) > 0 else 0
-    avg_periods_in_wins = np.mean(periods_in_trades[win_period_indices]) if len(win_period_indices) > 0 else 0
-    avg_periods_in_losses = np.mean(periods_in_trades[loss_period_indices]) if len(loss_period_indices) > 0 else 0
-    total_periods_in_trades = np.sum(periods_in_trades)
-    avg_periods_in_trades = np.mean(periods_in_trades)
+    # sum_periods_in_wins = np.sum(periods_in_trades[win_period_indices]) if len(win_period_indices) > 0 else 0
+    # sum_periods_in_losses = np.sum(periods_in_trades[loss_period_indices]) if len(loss_period_indices) > 0 else 0
+    # avg_periods_in_wins = np.mean(periods_in_trades[win_period_indices]) if len(win_period_indices) > 0 else 0
+    # avg_periods_in_losses = np.mean(periods_in_trades[loss_period_indices]) if len(loss_period_indices) > 0 else 0
+    # total_periods_in_trades = np.sum(periods_in_trades)
+    # avg_periods_in_trades = np.mean(periods_in_trades)
 
-    sharpe_ratio = calculate_sharpe_ratio(rets)
-    sortino_ratio = calculate_sortino_ratio(rets)
+    sharpe_ratio = calculate_sharpe_ratio(trade_rets)
+    sortino_ratio = calculate_sortino_ratio(trade_rets)
 
     return {
         'tot_return': total_return,
@@ -175,30 +133,31 @@ def calculate_metrics(trades, trade_rets):
         'sortino_ratio': sortino_ratio,
         'max_win': max_win,
         'max_loss': max_loss,
-        'sum_periods_in_wins': sum_periods_in_wins,
-        'sum_periods_in_losses': sum_periods_in_losses,
-        'avg_periods_in_wins': avg_periods_in_wins,
-        'avg_periods_in_losses': avg_periods_in_losses,
-        'total_periods_in_trades': total_periods_in_trades,
-        'avg_periods_in_trades': avg_periods_in_trades,
-        'returns': rets,
+        # 'sum_periods_in_wins': sum_periods_in_wins,
+        # 'sum_periods_in_losses': sum_periods_in_losses,
+        # 'avg_periods_in_wins': avg_periods_in_wins,
+        # 'avg_periods_in_losses': avg_periods_in_losses,
+        # 'total_periods_in_trades': total_periods_in_trades,
+        # 'avg_periods_in_trades': avg_periods_in_trades,
+        'returns': trade_rets,
         'cum_returns': cum_rets,
     }
 
 def print_metrics_table(metrics, convert_to_pct=False):
-    headers = ["Metric", "Overall", "Long Positions", "Short Positions"]
+    headers = ["Metric", "Value"]
     metrics_list = [
         'tot_return', 'max_drawdown', 'n_trades', 'sharpe_ratio', 'sortino_ratio', 
         'avg_return', 'max_win', 'max_loss', 'avg_win', 'avg_loss',
         'win_ratio', 'profit_factor', 'n_wins',
         'n_losses', 'avg_drawdown',
-        'sum_periods_in_wins', 'sum_periods_in_losses', 'avg_periods_in_wins', 'avg_periods_in_losses',
-        'total_periods_in_trades', 'avg_periods_in_trades'
+        # The following metrics are commented out because they aren't currently calculated
+        # 'sum_periods_in_wins', 'sum_periods_in_losses', 'avg_periods_in_wins', 'avg_periods_in_losses',
+        # 'total_periods_in_trades', 'avg_periods_in_trades'
     ]
     
     # Helper function to convert log returns and drawdowns to percentages
     def convert_log_to_pct(value):
-        return (np.exp(value) - 1) if convert_to_pct else value
+        return (np.exp(value)-1) if convert_to_pct else value
 
     # Metrics that should be converted to percentage if `convert_to_pct` is True
     conversion_metrics = {
@@ -207,21 +166,17 @@ def print_metrics_table(metrics, convert_to_pct=False):
     }
 
     # Print headers
-    print(f"{headers[0]:<25} | {headers[1]:>15} | {headers[2]:>15} | {headers[3]:>15}")
-    print("-" * 80)
+    print(f"{headers[0]:<25} | {headers[1]:>15}")
+    print("-" * 45)
     
     # Print each row dynamically
     for metric in metrics_list:
         if metric in conversion_metrics:
-            overall_value = convert_log_to_pct(metrics['overall_metrics'].get(metric, 0))
-            long_value = convert_log_to_pct(metrics['long_metrics'].get(metric, 0))
-            short_value = convert_log_to_pct(metrics['short_metrics'].get(metric, 0))
+            value = convert_log_to_pct(metrics.get(metric, 0))
         else:
-            overall_value = metrics['overall_metrics'].get(metric, 0)
-            long_value = metrics['long_metrics'].get(metric, 0)
-            short_value = metrics['short_metrics'].get(metric, 0)
+            value = metrics.get(metric, 0)
 
-        print(f"{metric.replace('_', ' ').title():<25} | {overall_value:>15.4f} | {long_value:>15.4f} | {short_value:>15.4f}")
+        print(f"{metric.replace('_', ' ').title():<25} | {value:>15.4f}")
 
 
 def suggest_params(trial, param_defs):
@@ -304,21 +259,28 @@ def get_nested_metric(metrics, path):
             return None
     return value
 
-def optimize(data, param_defs, indicators, signals, enable_long=True, enable_short=True, xmult=1, n_trials=100, 
+
+def generate_indicators(data,params,indicators):
+    
+    # Calculate indicators using params
+    for indicator in indicators:
+        indicator['function'](data, params)
+        
+def optimize(data, param_defs, indicators, signals_generator, btargs, xmult=1, n_trials=100, 
              optimize_metrics=None, directions=None):
     
     # Define default directions for each metric
     default_directions = {
         'sharpe_ratio': 'maximize',
         'sortino_ratio': 'maximize',
-        'max_drawdown': 'minimize',
+        'max_drawdown': 'maximize',
         'tot_return': 'maximize',
         'avg_drawdown': 'minimize',
         'avg_win': 'maximize',
         'avg_loss': 'minimize',
         'win_ratio': 'maximize',
         'profit_factor': 'maximize',
-        'n_trades': 'maximize',  # Depending on the context, some may want to minimize this
+        'n_trades': 'minimize',  # Depending on the context, some may want to minimize this
         'max_win': 'maximize',
         'max_loss': 'minimize',
     }
@@ -337,8 +299,10 @@ def optimize(data, param_defs, indicators, signals, enable_long=True, enable_sho
     
     def objective(trial):
         params = suggest_params(trial, param_defs)
-        # metrics = backtest_fn(data, nhours, params, short_long=short_long, xmult=xmult)
-        metrics = backtest(data, params, indicators=indicators, signals=signals, enable_long=True, enable_short=True)
+        skip_first = max(params['up_lookback']+params['up_lag'], params['dn_lookback']+params['dn_lag'])
+        generate_indicators(data,params,indicators)
+        enter_sigs, exit_sigs, xmult = signals_generator(data)
+        entry_indices, exit_indices, metrics = backtest(data.log_price, enter_sigs, exit_sigs, skip_first, xmult, **btargs)
         
         if not metrics:
             return [float('-inf') if d == 'maximize' else float('inf') for d in directions]
@@ -367,39 +331,29 @@ def optimize(data, param_defs, indicators, signals, enable_long=True, enable_sho
     return study
 
 
-def plot_performance(metrics, data, asset, params, indicators, signals, enable_long=True, enable_short=True):
+def plot_performance(entry_indices, exit_indices, metrics, data):
     
     
-    itrades = metrics['itrades']
+    # itrades = backtest_result['itrades']
 
-    if itrades is None or len(itrades) == 0:
+    if (entry_indices) == 0:
         print("No trades found.")
-        return None, metrics
-    
-    # Extract the trade exit points' indices
-    trade_exit_indices = itrades[:, 1]
-    
-    # Separate the indices for long and short trades
-    long_trade_indices = trade_exit_indices[itrades[:, 2] == 1]
-    short_trade_indices = trade_exit_indices[itrades[:, 2] == -1]
-
-    # Calculate cumulative returns for overall, long, and short positions
-    overall_cum_returns = metrics['overall_cum_returns']
-    long_cum_returns = metrics['long_cum_returns']
-    short_cum_returns = metrics['short_cum_returns']
+        return None, None
+        
+    cum_returns = metrics['cum_returns']
 
     # Align the cumulative returns with the trade exit indices
-    combined_pnl_pct = pd.Series(np.exp(overall_cum_returns)).subtract(1).set_axis(data.index[trade_exit_indices])
+    pnl_pct = pd.Series(np.exp(cum_returns)).subtract(0).set_axis(data.index[exit_indices])
 
-    if len(long_trade_indices) > 0:
-        long_pnl_pct = pd.Series(np.exp(long_cum_returns)).subtract(1).set_axis(data.index[long_trade_indices])
-    else:
-        long_pnl_pct = pd.Series([0] * len(data)).subtract(1).set_axis(data.index)
+    # if len(long_trade_indices) > 0:
+    #     long_pnl_pct = pd.Series(np.exp(long_cum_returns)).subtract(1).set_axis(data.index[long_trade_indices])
+    # else:
+    #     long_pnl_pct = pd.Series([0] * len(data)).subtract(1).set_axis(data.index)
 
-    if len(short_trade_indices) > 0:
-        short_pnl_pct = pd.Series(np.exp(short_cum_returns)).subtract(1).set_axis(data.index[short_trade_indices])
-    else:
-        short_pnl_pct = pd.Series([0] * len(data)).subtract(1).set_axis(data.index)
+    # if len(short_trade_indices) > 0:
+    #     short_pnl_pct = pd.Series(np.exp(short_cum_returns)).subtract(1).set_axis(data.index[short_trade_indices])
+    # else:
+    #     short_pnl_pct = pd.Series([0] * len(data)).subtract(1).set_axis(data.index)
 
     # Plot the results with the best parameters
 
@@ -408,26 +362,28 @@ def plot_performance(metrics, data, asset, params, indicators, signals, enable_l
 
     # Plot PnL as percentage for long, short, and combined
     ax2.axhline(0, color='black', lw=1)  # Baseline for percentage returns
-    ax2.plot(combined_pnl_pct.index, combined_pnl_pct, label='Combined PNL %', color='teal', alpha=0.8, lw=2)
-    if len(long_trade_indices) > 0:
-        ax2.plot(long_pnl_pct.index, long_pnl_pct, label='Long PNL %', color='green', alpha=0.8, lw=2)
-    if len(short_trade_indices) > 0:
-        ax2.plot(short_pnl_pct.index, short_pnl_pct, label='Short PNL %', color='red', alpha=0.8, lw=2)
+    ax2.plot(pnl_pct.index, pnl_pct, label='Combined PNL %', color='teal', alpha=0.8, lw=2)
+    if len(pnl_pct) > 0:
+        ax2.plot(pnl_pct.index, pnl_pct, label='PNL %', color='green', alpha=0.8, lw=2)
+    # if len(short_trade_indices) > 0:
+    #     ax2.plot(short_pnl_pct.index, short_pnl_pct, label='Short PNL %', color='red', alpha=0.8, lw=2)
     
     ax2.set_yscale('log', base=2)
     ax2.legend(loc='best')
 
     # Plot entry and exit points
-    for x in metrics['entry_points'].values: 
+    for x in data.index[entry_indices]: 
         ax1.axvline(x, color='blue', lw=1, alpha=0.2)
         ax2.axvline(x, color='blue', lw=1, alpha=0.2)
-    for xx in metrics['exit_points'].values:
-        ax1.axvline(xx, color='red', lw=1, alpha=0.2)
-        ax2.axvline(xx, color='red', lw=1, alpha=0.2)
-    for i in range(len(itrades)):
-        color = ['red', 'green'][(itrades[i, 2] + 1) // 2]
-        ax1.axvspan(xmin=data.index[itrades[i, 0]], xmax=data.index[itrades[i, 1]], color=color, alpha=0.1)
-        ax2.axvspan(xmin=data.index[itrades[i, 0]], xmax=data.index[itrades[i, 1]], color=color, alpha=0.1)
+    for xx in data.index[exit_indices]:
+        ax1.axvline(xx, color='green', lw=1, alpha=0.2)
+        ax2.axvline(xx, color='green', lw=1, alpha=0.2)
+    for i in range(len(entry_indices)):
+        # color = ['red', 'green'][list((metrics['returns'].values < 0).astype(int))]
+        # color = [['green','red'][i] for i in (metrics['returns'] < 0.0).values.astype(int)]
+        color = 'gray'
+        ax1.axvspan(xmin=data.index[entry_indices[i]], xmax=data.index[exit_indices[i]], color=color, alpha=0.1)
+        ax2.axvspan(xmin=data.index[entry_indices[i]], xmax=data.index[exit_indices[i]], color=color, alpha=0.1)
     
     ax2.grid(axis='y')
     # plt.show()

@@ -1,6 +1,9 @@
 import 'lib2/json'.
+% import 'lib2/util'.
+import sys.
 import io.
 import math.
+import util.
 
 % export PICATPATH=/media/mu6mula/Data/work/picat/Picat368/lib2:/media/mu6mula/Data/work/picat/Picat368/lib
 % export PATH=$PATH:/media/mu6mula/Data/work/picat/Picat368
@@ -12,52 +15,39 @@ main =>
     Exchange = "binance",
     Base = "BTC",
     Quote = "USDT",
-    Timeframe = "8h",
+    Timeframe = "4h",
     % Load the candlestick data
-    OHLCV = load_candles(Exchange, Base, Quote, Timeframe, 1000, 5000),
-    Len = len(OHLCV),
+    OHLCV = transpose(list_matrix_to_array_matrix(load_candles(Exchange, Base, Quote, Timeframe, 1, 1000))),
+    Len = len(OHLCV[1]),
+    % printf("Loaded OHLCV %s / %s / %s / %s , Length: %d \n", Exchange, Base, Quote, Timeframe, Len),
+
     
     % Define the parameter for the Donchian Channels
-    LBackP_Up = 96,
-    LagP_Up = 17,
-    LBackP_Dn = 56,
-    LagP_Dn = 17,
+    LBackP_Up = 95,
+    LBackP_Dn = 28,
+    LagP_Up = 16,
+    LagP_Dn = 12,
+    BandOffset = 0.8242584668754623,  % You can set this between 0 and 1
+
     Skip = max([LBackP_Up,LBackP_Dn,LagP_Up,LagP_Dn]),
-
-    % Extract the necessary fields from OHLCV data
-    BandOffset = 0.4530,  % You can set this between 0 and 1
-
-    Highs = [Row[3] : Row in OHLCV],
-    Lows = [Row[4] : Row in OHLCV],
-    Closes = [Row[5] : Row in OHLCV],
-    LogPrices = [log(Close) : Close in Closes],
+    
+    Highs = OHLCV[3],
+    Lows = OHLCV[4],
+    Closes = OHLCV[5],
+    LogPrices = {log(Close) : Close in Closes},
 
     % Calculate the log returns
-    LogReturns = [0]++[LogPrices[I] - LogPrices[I-1] : I in 2..len(LogPrices)],
+    LogRets = {LogPrices[I] - LogPrices[I-1] : I in 2..len(LogPrices)}++{0},
 
-    RollingMax = rolling_max(Highs, LBackP_Up),
-    % printf("RollingMax: %w\n", [RollingMax[I]: I in Skip..Len]),
+    DonchUp = shift_array(rolling_max(Highs, LBackP_Up), LagP_Up),
+    DonchDn = shift_array(rolling_min(Lows, LBackP_Dn), LagP_Dn),
+    MidBand = zeros_array(Skip) ++ {(1 - BandOffset) * DonchUp[I] + BandOffset * DonchDn[I] : I in Skip + 1..Len},
 
-    % % Calculate the Donchian Channels
-    UpperBand = calculate_upper_band(Highs, LBackP_Up, LagP_Up),
-    LowerBand = calculate_lower_band(Lows, LBackP_Dn, LagP_Dn),
-    % printf("UpperBand: %w\n", [UpperBand[I]: I in Skip..Len]),
-    % printf("LowerBand: %w\n", [LowerBand[I]: I in Skip..Len]),
-    % MidBand = calculate_mid_band(UpperBand, LowerBand, BandOffset),
-    % Band = zip(UpperBand, LowerBand),
-    MidBand = new_list(Skip,0) ++ [(1 - BandOffset) * UpperBand[I] + BandOffset * LowerBand[I] : I in Skip + 1..Len],
+    LongEnterSignals = zeros_array(Skip) ++ {above(Closes[I], DonchUp[I]) : I in Skip+1..len(DonchUp)},
+    LongExitSignals = zeros_array(Skip)  ++ {above(MidBand[I], Closes[I]) : I in Skip+1..len(MidBand)},
 
-    % printf("MidBand: %w\n", [MidBand[I]: I in Skip..Len]),
-
-    LongEnterSignals = new_list(Skip,0) ++ 
-                  [above(Closes[I], UpperBand[I]) : I in Skip+1..len(UpperBand)],
-    LongExitSignals = new_list(Skip,0)  ++ 
-                      [above(MidBand[I], Closes[I]) : I in Skip+1..len(MidBand)],
-
-    ShortEnterSignals = new_list(Skip,0)  ++ 
-                   [above(LowerBand[I], Closes[I]) : I in Skip+1..len(LowerBand)],
-    ShortExitSignals = new_list(Skip,0)  ++ 
-                       [above(Closes[I], MidBand[I]) : I in Skip+1..len(MidBand)],
+    ShortEnterSignals = zeros_array(Skip) ++ {above(DonchDn[I], Closes[I]) : I in Skip+1..len(DonchDn)},
+    ShortExitSignals = zeros_array(Skip) ++ {above(Closes[I], MidBand[I]) : I in Skip+1..len(MidBand)},
 
     % printf("LongEnterSignals: %d\n", sum(LongEnterSignals)),
     % printf("ShortEnterSignals: %d\n", sum(ShortEnterSignals)),
@@ -67,31 +57,83 @@ main =>
     % Generate positions
     % LongPositions = populate_positions(LongEnterSignals, LongExitSignals, Skip),
     % ShortPositions = populate_positions(ShortEnterSignals, ShortExitSignals, Skip),
-    LongPositions = new_list(Skip,0) ++ [LongEnterSignals[I] * (1 - LongExitSignals[I]) : I in Skip+1..Len],
-    ShortPositions = new_list(Skip,0) ++ [-ShortEnterSignals[I] * (1 - ShortExitSignals[I]) : I in Skip+1..Len],
+    LongPositions = zeros_array(Skip) ++ {LongEnterSignals[I] * (1 - LongExitSignals[I]) : I in Skip+1..Len},
+    ShortPositions = zeros_array(Skip) ++ {ShortEnterSignals[I] * (1 - ShortExitSignals[I]) : I in Skip+1..Len},
 
     % printf("LongPositions: %w\n", [LongPositions[I]: I in Skip..Len]),
     % printf("ShortPositions: %w\n", [ShortPositions[I]: I in Skip..Len]),
     % Calculate returns for both long and short positions
-    % LongReturns = calculate_returns(LongPositions, LogReturns),
-    % ShortReturns = calculate_returns(ShortPositions, LogReturns),
+    % LongRets = calculate_returns(LongPositions, LogReturns),
+    % ShortRets = calculate_returns(ShortPositions, LogReturns),
+    {LongTradeStarts,LongTradeEnds} = position_starts_ends(LongPositions, Len, Skip),
+    printf("HAHAHA"),
+    {ShortTradeStarts,ShortTradeEnds} = position_starts_ends(ShortPositions, Len, Skip),
 
-    LongReturns = new_list(Skip,0)++[LongPositions[I] * LogReturns[I] : I in Skip+1..Len],
-    ShortReturns = new_list(Skip,0)++[ShortPositions[I] * LogReturns[I] : I in Skip+1..Len],
+    % LongTradeStarts = [I : I in Skip+1..Len, LongPositions[I] == 1, LongPositions[I-1] == 0],
+    % LongTradeEnds = [I : I in Skip+1..Len-1, (LongPositions[I] == 0) , (LongPositions[I-1] == 1)] ++ cond(LongPositions[Len]==1, [1], []),
+    % LongTradeRets = {LogPrices[LongTradeEnds[i]] - LogPrices[LongTradeStarts[I]] : I in 1..len(LongTradeStarts)},
+    LongTradeRets = {LogPrices[TradeEnd] - LogPrices[TradeStart] : {TradeStart,TradeEnd} in zip(LongTradeStarts,LongTradeEnds)},
+    ShortTradeRets = {LogPrices[TradeEnd] - LogPrices[TradeStart] : {TradeStart,TradeEnd} in zip(ShortTradeStarts,ShortTradeEnds)},
+    LongTradeReturn = sum(LongTradeRets),
+    ShortTradeReturn = sum(ShortTradeRets),
+    % ShortTradeStarts = [I : I in Skip+1..Len, LongPositions[I] == 1, LongPositions[I-1] == 0],
+    % ShortTradeEnds = [I : I in Skip+1..Len, LongPositions[I] == 1, LongPositions[I-1] == 0],
+    writeln(LongTradeStarts),
+    writeln(LongTradeStarts),
+    writeln(len(LongTradeStarts)),
+    
+    writeln(LongTradeEnds),
+    writeln(len(LongTradeEnds)),
 
-    % Calculate total return by summing long and short returns
-    TotalReturn = sum(LongReturns) + sum(ShortReturns),
-    CombinedReturns = [LongReturns[I] + ShortReturns[I] : I in 1..Len],
+    LongRets = zeros_array(Skip)++{LongPositions[I] * LogRets[I] : I in Skip+1..Len},
+    ShortRets = zeros_array(Skip)++{ShortPositions[I] * LogRets[I] : I in Skip+1..Len},
+    % printf("LongRets\n\t\t"),
+    % writeln(LongRets),
+    
+    % Calculate total return by summing long and short returns,
+    LongReturn = sum(LongRets),
+    ShortReturn = sum(ShortRets),
+    % printf("LongReturn: %f", LongReturn),
+    TotalReturn = LongReturn + ShortReturn,
+    CombinedReturns = {LongRets[I] + ShortRets[I] : I in 1..Len},
+
+    % LongStartIndexes = cond(Len == 0, [], 
+    %     cond(LongPositions[1] !== 0, [1], [])
+    % ) ++ [I : I in 2..Len, (LongPositions[I] )],
+    % LongStartIndexes = [I : I in 1..Len, ((LongPositions[I] !== 0), (I == 1 ; LongPositions[I-1] == 0))],
+    % {LongStartIndexes, LongEndIndexes} = detect_sequences(LongRets),
+    % {ShortStartIndexes, ShortEndIndexes} = detect_sequences(ShortRets),
+    % printf("LongStartIndexes: %d\n", len(LongStartIndexes)),
+    % printf("ShortStartIndexes: %d\n", len(ShortStartIndexes)),
+    % printf("LongStartIndexes: %w\n", LondStartIndexes),
+    % foreach (I in 1..len(LongStartIndexes))
+    %     printf("%d,",LongStartIndexes[I])
+    % end,
 
     % Output the results for verification
     % printf("LongPositions: %w\n", LongPositions),
     % printf("ShortPositions: %w\n", ShortPositions),
-    % printf("LongReturns: %w\n", LongReturns),
-    % printf("ShortReturns: %w\n", ShortReturns),
+    % printf("LongRets: %w\n", LongRets),
+    % printf("ShortRets: %w\n", ShortRets),
     % printf("CombinedReturns: %w\n", CombinedReturns),
+    printf("LongReturn: %f\n", LongReturn),
+    printf("LongTradeReturn: %f\n", LongTradeReturn),
+    printf("ShortReturn: %f\n", ShortReturn),
+    printf("ShortTradeReturn: %f\n", ShortTradeReturn),
     printf("TotalReturn: %f\n", TotalReturn)
-    
     .
+
+position_starts_ends(Positions, Len, Skip) = {PositionStarts, PositionEnds} =>
+    PositionStarts = [I : I in Skip+1..Len, Positions[I] == 1, Positions[I-1] == 0],
+    PositionEnds = [I : I in Skip+1..Len-1, (Positions[I] == 0) , (Positions[I-1] == 1)] ++ cond(Positions[Len]==1, [1], [])
+.
+
+zeros_array(Len) = Result =>
+    Result = new_array(Len),
+    foreach (I in 1..Len)
+        Result[I] = 0
+    end.
+
 
 % Function to load candlestick data
 load_candles(Exchange, Base, Quote, Timeframe, From, To) = Candles =>
@@ -100,53 +142,71 @@ load_candles(Exchange, Base, Quote, Timeframe, From, To) = Candles =>
     FileName = "/media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data/" ++ Exchange ++ "/" ++ Base ++ "_" ++ Quote ++ "-" ++ Timeframe ++ ".json",
     S = read_file_chars(FileName),
     AllCandles = json_decode(S),
-    Candles = [AllCandles[I] : I in From..To]
+    Len = len(AllCandles),
+    Candles = [AllCandles[I] : I in From..min([To,Len])]
     .
 
 % Predicate to calculate the upper band of Donchian Channels with lagging
-calculate_upper_band(Highs, LBackP_Up, Lag) = UpperBand =>
-    RollingMax = rolling_max(Highs, LBackP_Up),
-    LaggedRollingMax = lag_list(RollingMax, Lag),
-    UpperBand = pad_list(LaggedRollingMax, len(Highs), 0).
+% calculate_upper_band(Highs, LBackP_Up, Lag) = DonchUp =>
+%     RollingMax = rolling_max(Highs, LBackP_Up),
+%     LaggedRollingMax = lag_list(RollingMax, Lag),
+%     DonchUp = pad_list(LaggedRollingMax, len(Highs), 0).
 
-% Predicate to calculate the lower band of Donchian Channels with lagging
-calculate_lower_band(LowPrices, LBackP_Up, Lag) = LowerBand =>
-    RollingMin = rolling_min(LowPrices, LBackP_Up),
-    LaggedRollingMin = lag_list(RollingMin, Lag),
-    LowerBand = pad_list(LaggedRollingMin, len(LowPrices), 0).
+% % Predicate to calculate the lower band of Donchian Channels with lagging
+% calculate_lower_band(LowPrices, LBackP_Up, Lag) = DonchDn =>
+%     RollingMin = rolling_min(LowPrices, LBackP_Up),
+%     LaggedRollingMin = lag_list(RollingMin, Lag),
+%     DonchDn = pad_list(LaggedRollingMin, len(LowPrices), 0).
 
 % Function to calculate the rolling maximum over a specified period with zero padding
-rolling_max(List, Period) = PaddedResult =>
-    Len = len(List),
-    RollingMax = [max([List[J] : J in I..I+Period-1]) : I in 1..Len-Period+1],
-    Padding = new_list(Period-1, 0),
-    PaddedResult = Padding ++ RollingMax.
+rolling_max(Array, Period) = ResultArray =>
+    Len = len(Array),
+    
+    % Ensure the array is long enough for the period
+    if Period =< Len then
+        ResultArray = new_array(Len),
+        foreach (I in 1..Period-1)
+            ResultArray[I] = 0
+        end,
+        % Calculate the rolling max for the valid range
+        foreach (I in Period..Len)
+            % Determine the maximum in the current window
+            MaxValue = max([Array[J] : J in I-Period+1..I]),
+            % Assign the maximum value to the current position in the result array
+            ResultArray[I] = MaxValue
+        end
+    else
+        ResultArray = new_array(Len,0)
+    end.
 
-% Function to calculate the rolling minimum over a specified period with zero padding
-rolling_min(List, Period) = PaddedResult =>
-    Len = len(List),
-    RollingMin = [min([List[J] : J in I..I+Period-1]) : I in 1..Len-Period+1],
-    Padding = new_list(Period-1, 0),
-    PaddedResult = Padding ++ RollingMin.
+rolling_min(Array, Period) = ResultArray =>
+    Len = len(Array),
+    
+    % Ensure the array is long enough for the period
+    if Period =< Len then
+        ResultArray = new_array(Len),
+        foreach (I in 1..Period-1)
+            ResultArray[I] = 0
+        end,
+        % Calculate the rolling max for the valid range
+        foreach (I in Period..Len)
+            % Determine the maximum in the current window
+            MaxValue = min([Array[J] : J in I-Period+1..I]),
+            % Assign the maximum value to the current position in the result array
+            ResultArray[I] = MaxValue
+        end
+    else
+        ResultArray = new_array(Len,0)
+    end.
+
 
 % Function to lag a list by a specified number of periods
-lag_list(List, Lag) = LaggedList =>
-    Padding = new_list(Lag, 0),
+shift_array(List, Lag) = LaggedList =>
+    Padding = new_array(Lag),
+    foreach (I in 1..Lag) Padding[I] = 0 end,
     LaggedList = Padding ++ List[1..len(List)-Lag].
-
-% Function to pad a list to a specified length with a given value
-pad_list(List, TargetLength, PaddingValue) = PaddedList =>
-    % printf("len(list): %d\n", len(List)),
-    % printf("TargetLength: %d\n", TargetLength),
-    PaddingLength = TargetLength - len(List),
-    Padding = new_list(PaddingLength, PaddingValue),
-    PaddedList = List ++ Padding.
-
 
 % Function to generate a signal based on a condition
 above(Value1, Value2) = cond(Value1 > Value2, 1, 0).
 % above(Value1, Value2) = F, Value1 <= Value2 => F = 0.
 
-% Function to calculate the mid band based on the upper band, lower band, and a band offset
-calculate_mid_band(UpperBand, LowerBand, BandOffset) = MidBand =>
-    MidBand = [(1 - BandOffset) * Upper + BandOffset * Lower : (Upper, Lower) in zip(UpperBand, LowerBand)].
