@@ -20,8 +20,8 @@ def backtest(log_price, enter_sigs, exit_sigs, skip_first, xmult, transaction_co
     entry_indices, exit_indices = position_tools.enumerate_trades(enter_sigs.values, exit_sigs.values, skip_first)
 
     if len(entry_indices) == 0:
-        print('No trades found.')
-        return {}
+        # print('No trades found.')
+        return [], [], {}
 
     # Calculate trade returns using log prices
     trade_rets = pd.Series(
@@ -301,7 +301,7 @@ def optimize(data, param_defs, indicators, signals_generator, btargs, xmult=1, n
         params = suggest_params(trial, param_defs)
         skip_first = max(params['up_lookback']+params['up_lag'], params['dn_lookback']+params['dn_lag'])
         generate_indicators(data,params,indicators)
-        enter_sigs, exit_sigs, xmult = signals_generator(data)
+        enter_sigs, exit_sigs, xmult = signals_generator(data, params)
         entry_indices, exit_indices, metrics = backtest(data.log_price, enter_sigs, exit_sigs, skip_first, xmult, **btargs)
         
         if not metrics:
@@ -331,14 +331,35 @@ def optimize(data, param_defs, indicators, signals_generator, btargs, xmult=1, n
     return study
 
 
+def comp_backtest(data,params,indicators,generate_indicators,generate_signals):
+    generate_indicators(data,params,indicators)
+    enter_sigs, exit_sigs, xmult = generate_signals(data,params)
+    skip_first = max(params['up_lookback']+params['up_lag'], params['dn_lookback']+params['dn_lag'])    
+    if skip_first >= len(data):
+        return None,None,None
+    entry_indices, exit_indices, metrics = backtest(data.log_price, enter_sigs, exit_sigs, skip_first, xmult, transaction_cost=0.001, slippage=0.003, precision=3, period_costs=None)
+    return entry_indices, exit_indices, metrics
+
+
+def plot_strategy(data,metrics,entry_indices,exit_indices,plot_indicators):
+    if len(entry_indices) > 0:
+        print_metrics_table(metrics, convert_to_pct=True)
+        fig_train = plot_performance(entry_indices, exit_indices, metrics,data)
+        # if not fig_train is None:
+        plot_indicators(fig_train.get_axes()[0], data)
+        plt.show()
+    else:
+        print('No Trades.')
+        
+        
 def plot_performance(entry_indices, exit_indices, metrics, data):
     
     
     # itrades = backtest_result['itrades']
 
-    if (entry_indices) == 0:
+    if len(entry_indices) == 0:
         print("No trades found.")
-        return None, None
+        return None
         
     cum_returns = metrics['cum_returns']
 
