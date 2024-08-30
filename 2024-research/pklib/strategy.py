@@ -28,7 +28,6 @@ def backtest(log_price, enter_sigs, exit_sigs, skip_first, xmult, transaction_co
         xmult * (log_price.iloc[exit_indices].values - log_price.iloc[entry_indices].values),
         index=log_price.index[exit_indices]
     )
-    trade_rets *= xmult
     trade_rets -= np.log1p(2*transaction_cost + slippage)
 
     metrics = calculate_metrics(trade_rets)
@@ -266,7 +265,7 @@ def generate_indicators(data,params,indicators):
     for indicator in indicators:
         indicator['function'](data, params)
         
-def optimize(data, param_defs, indicators, signals_generator, btargs, xmult=1, n_trials=100, 
+def optimize(data, param_defs, indicators, signals_generator, skip_first_fn, btargs, long_short, n_trials=100, 
              optimize_metrics=None, directions=None):
     
     # Define default directions for each metric
@@ -285,6 +284,9 @@ def optimize(data, param_defs, indicators, signals_generator, btargs, xmult=1, n
         'max_loss': 'minimize',
     }
     
+    long_short = 'long'
+    xmult = [1,-1][long_short=='short']
+    
     # Set default metrics if none provided
     if optimize_metrics is None:
         optimize_metrics = ['sharpe_ratio']  # Default metric
@@ -299,9 +301,11 @@ def optimize(data, param_defs, indicators, signals_generator, btargs, xmult=1, n
     
     def objective(trial):
         params = suggest_params(trial, param_defs)
-        skip_first = max(params['up_lookback']+params['up_lag'], params['dn_lookback']+params['dn_lag'])
+        skip_first = skip_first_fn(params)
         generate_indicators(data,params,indicators)
-        enter_sigs, exit_sigs, xmult = signals_generator(data, params)
+        enter_sigs = signals_generator[f'{long_short}_enter'](data, params)
+        exit_sigs = signals_generator[f'{long_short}_enter'](data, params)
+        
         entry_indices, exit_indices, metrics = backtest(data.log_price, enter_sigs, exit_sigs, skip_first, xmult, **btargs)
         
         if not metrics:
@@ -331,13 +335,22 @@ def optimize(data, param_defs, indicators, signals_generator, btargs, xmult=1, n
     return study
 
 
-def comp_backtest(data,params,indicators,generate_indicators,generate_signals):
-    generate_indicators(data,params,indicators)
-    enter_sigs, exit_sigs, xmult = generate_signals(data,params)
-    skip_first = max(params['up_lookback']+params['up_lag'], params['dn_lookback']+params['dn_lag'])    
+def comp_backtest(data, params, indicators, generate_indicators, signals_generator, long_short, skip_first_fn, flip_signal=False, **btargs):
+    generate_indicators(data, params, indicators)
+    
+    # long_short = 'long'
+    xmult = [1, -1][long_short == 'short']
+    xmult = [xmult, -xmult][flip_signal]
+    
+    enter_sigs = signals_generator[f'{long_short}_enter'](data, params)
+    exit_sigs = signals_generator[f'{long_short}_exit'](data, params)  # Fixed to correctly reference the exit signals
+    
+    skip_first = skip_first_fn(params)
+    
     if skip_first >= len(data):
-        return None,None,None
-    entry_indices, exit_indices, metrics = backtest(data.log_price, enter_sigs, exit_sigs, skip_first, xmult, transaction_cost=0.001, slippage=0.003, precision=3, period_costs=None)
+        return None, None, None
+    
+    entry_indices, exit_indices, metrics = backtest(data.log_price, enter_sigs, exit_sigs, skip_first, xmult, **btargs)
     return entry_indices, exit_indices, metrics
 
 
@@ -364,7 +377,10 @@ def plot_performance(entry_indices, exit_indices, metrics, data):
     cum_returns = metrics['cum_returns']
 
     # Align the cumulative returns with the trade exit indices
-    pnl_pct = pd.Series(np.exp(cum_returns)).subtract(0).set_axis(data.index[exit_indices])
+    pnl_pct = pd.concat([
+        pd.Series(cum_returns, index=data.index.values[exit_indices]),
+        pd.Series(cum_returns.shift(fill_value=0).values, index=data.index.values[entry_indices])
+    ]).sort_index().apply(np.expm1)
 
     # if len(long_trade_indices) > 0:
     #     long_pnl_pct = pd.Series(np.exp(long_cum_returns)).subtract(1).set_axis(data.index[long_trade_indices])
@@ -383,13 +399,13 @@ def plot_performance(entry_indices, exit_indices, metrics, data):
 
     # Plot PnL as percentage for long, short, and combined
     ax2.axhline(0, color='black', lw=1)  # Baseline for percentage returns
-    ax2.plot(pnl_pct.index, pnl_pct, label='Combined PNL %', color='teal', alpha=0.8, lw=2)
+    ax2.plot(pnl_pct.index, pnl_pct, label='Combined PNL %/100', color='teal', alpha=0.8, lw=2)
     if len(pnl_pct) > 0:
-        ax2.plot(pnl_pct.index, pnl_pct, label='PNL %', color='green', alpha=0.8, lw=2)
+        ax2.plot(pnl_pct.index, pnl_pct, label='PNL %/100', color='green', alpha=0.8, lw=2)
     # if len(short_trade_indices) > 0:
     #     ax2.plot(short_pnl_pct.index, short_pnl_pct, label='Short PNL %', color='red', alpha=0.8, lw=2)
     
-    ax2.set_yscale('log', base=2)
+    # ax2.set_yscale('log', base=2)
     ax2.legend(loc='best')
 
     # Plot entry and exit points
