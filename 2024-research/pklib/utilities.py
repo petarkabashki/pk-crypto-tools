@@ -17,6 +17,15 @@ def load_futures_candles(exchange,base,quote,timeframe):
     fname = f'/media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data/{exchange}/futures/{base}_{quote}_{quote}-{timeframe}-futures.json'
     return load_json_candles(fname)
 
+
+def load_index_candles(ticker):
+    fname = f'/media/mu6mula/Data/Crypto-Data-Feed/indexes-data/{ticker}.csv'
+    data = pd.read_csv(fname)
+    data['Date'] = pd.to_datetime(data.Date)
+    data.columns = [c.lower() for c in data.columns]
+    data.set_index('date', inplace=True)
+    return data
+
 def load_sp500_stock_candles(ticker):
     fname = f'/media/mu6mula/Data/Crypto-Data-Feed/sp500_data/{ticker}.csv'
     data = pd.read_csv(fname)

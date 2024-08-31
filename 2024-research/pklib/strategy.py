@@ -219,7 +219,7 @@ def suggest_params(trial, param_defs):
                     max_value = param_config['max_depends_on'].get('adjust_max', lambda v: v)(params[max_dep_param])
                 
                 # Collect additional arguments if any
-                additional_args = {k: v for k, v in param_config.items() if k not in ['method', 'min', 'max', 'min_depends_on', 'max_depends_on']}
+                additional_args = {k: v for k, v in param_config.items() if k not in ['method', 'min', 'max', 'min_depends_on', 'max_depends_on', 'adjust_start']}
                 
                 # Suggest the parameter value
                 params[param_name] = method(param_name, min_value, max_value, **additional_args)
@@ -301,12 +301,13 @@ def optimize(data, param_defs, indicators, signals_generator, skip_first_fn, bta
     
     def objective(trial):
         params = suggest_params(trial, param_defs)
-        skip_first = skip_first_fn(params)
-        generate_indicators(data,params,indicators)
-        enter_sigs = signals_generator[f'{long_short}_enter'](data, params)
-        exit_sigs = signals_generator[f'{long_short}_enter'](data, params)
+        entry_indices, exit_indices, metrics = comp_backtest(data,param_defs,params,indicators,generate_indicators, signals_generator, long_short=long_short, skip_first_fn=skip_first_fn, flip_signal=False, **btargs)
+        # skip_first = skip_first_fn(param_defs, params)
+        # generate_indicators(data,params,indicators)
+        # enter_sigs = signals_generator[f'{long_short}_enter'](data, params)
+        # exit_sigs = signals_generator[f'{long_short}_enter'](data, params)
         
-        entry_indices, exit_indices, metrics = backtest(data.log_price, enter_sigs, exit_sigs, skip_first, xmult, **btargs)
+        # entry_indices, exit_indices, metrics = backtest(data.log_price, enter_sigs, exit_sigs, skip_first, xmult, **btargs)
         
         if not metrics:
             return [float('-inf') if d == 'maximize' else float('inf') for d in directions]
@@ -335,7 +336,7 @@ def optimize(data, param_defs, indicators, signals_generator, skip_first_fn, bta
     return study
 
 
-def comp_backtest(data, params, indicators, generate_indicators, signals_generator, long_short, skip_first_fn, flip_signal=False, **btargs):
+def comp_backtest(data, param_defs, params, indicators, generate_indicators, signals_generator, long_short, skip_first_fn, flip_signal=False, **btargs):
     generate_indicators(data, params, indicators)
     
     # long_short = 'long'
@@ -345,7 +346,7 @@ def comp_backtest(data, params, indicators, generate_indicators, signals_generat
     enter_sigs = signals_generator[f'{long_short}_enter'](data, params)
     exit_sigs = signals_generator[f'{long_short}_exit'](data, params)  # Fixed to correctly reference the exit signals
     
-    skip_first = skip_first_fn(params)
+    skip_first = skip_first_fn(param_defs, params)
     
     if skip_first >= len(data):
         return None, None, None
