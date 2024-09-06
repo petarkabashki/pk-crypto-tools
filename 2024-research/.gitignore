@@ -1,3 +1,6 @@
 .fuse*
 *.so
 strat_results/
+*.zip
+results/
+*.csv

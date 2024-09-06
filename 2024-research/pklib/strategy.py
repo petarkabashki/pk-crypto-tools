@@ -95,24 +95,6 @@ def calculate_metrics(trade_rets):
     max_drawdown = drawdowns.min()
     avg_drawdown = drawdowns.mean()
 
-    # Calculate the number of periods for each trade
-    # periods_in_trades = trades[:, 1] - trades[:, 0] + 1  # periods in each trade
-
-    # Calculate periods metrics
-    # win_indices = wins.index.values
-    # loss_indices = losses.index.values
-
-    # Safely handle periods in trades by using valid indices
-    # win_period_indices = [i for i, end_idx in enumerate(trades[:, 1]) if end_idx in win_indices]
-    # loss_period_indices = [i for i, end_idx in enumerate(trades[:, 1]) if end_idx in loss_indices]
-
-    # sum_periods_in_wins = np.sum(periods_in_trades[win_period_indices]) if len(win_period_indices) > 0 else 0
-    # sum_periods_in_losses = np.sum(periods_in_trades[loss_period_indices]) if len(loss_period_indices) > 0 else 0
-    # avg_periods_in_wins = np.mean(periods_in_trades[win_period_indices]) if len(win_period_indices) > 0 else 0
-    # avg_periods_in_losses = np.mean(periods_in_trades[loss_period_indices]) if len(loss_period_indices) > 0 else 0
-    # total_periods_in_trades = np.sum(periods_in_trades)
-    # avg_periods_in_trades = np.mean(periods_in_trades)
-
     sharpe_ratio = calculate_sharpe_ratio(trade_rets)
     sortino_ratio = calculate_sortino_ratio(trade_rets)
 
@@ -132,31 +114,35 @@ def calculate_metrics(trade_rets):
         'sortino_ratio': sortino_ratio,
         'max_win': max_win,
         'max_loss': max_loss,
-        # 'sum_periods_in_wins': sum_periods_in_wins,
-        # 'sum_periods_in_losses': sum_periods_in_losses,
-        # 'avg_periods_in_wins': avg_periods_in_wins,
-        # 'avg_periods_in_losses': avg_periods_in_losses,
-        # 'total_periods_in_trades': total_periods_in_trades,
-        # 'avg_periods_in_trades': avg_periods_in_trades,
         'returns': trade_rets,
         'cum_returns': cum_rets,
     }
-
-def print_metrics_table(metrics, convert_to_pct=False):
-    headers = ["Metric", "Value"]
+    
+def print_metrics_table(metrics, convert_to_pct=False, mult_100=False):
+    default_precision=2
+    # Determine the suffix for the headers based on the conversion type
+    header_suffix = " (%)" if convert_to_pct else " (log)"
+    
+    # Adjust the headers by appending the appropriate suffix
+    headers = ["Metric", f"Value{header_suffix}"]
+    
     metrics_list = [
         'tot_return', 'max_drawdown', 'n_trades', 'sharpe_ratio', 'sortino_ratio', 
         'avg_return', 'max_win', 'max_loss', 'avg_win', 'avg_loss',
         'win_ratio', 'profit_factor', 'n_wins',
         'n_losses', 'avg_drawdown',
-        # The following metrics are commented out because they aren't currently calculated
-        # 'sum_periods_in_wins', 'sum_periods_in_losses', 'avg_periods_in_wins', 'avg_periods_in_losses',
-        # 'total_periods_in_trades', 'avg_periods_in_trades'
     ]
+    
+    # Define the precision for each metric (overrides the default precision)
+    metric_precision = {
+        'n_trades': 0, 'n_wins': 0, 'n_losses': 0
+    }
+    
+    pct_mult = 100 if mult_100 and convert_to_pct else 1
     
     # Helper function to convert log returns and drawdowns to percentages
     def convert_log_to_pct(value):
-        return (np.exp(value)-1) if convert_to_pct else value
+        return (np.exp(value) - 1) * pct_mult if convert_to_pct else value
 
     # Metrics that should be converted to percentage if `convert_to_pct` is True
     conversion_metrics = {
@@ -164,7 +150,7 @@ def print_metrics_table(metrics, convert_to_pct=False):
         'max_drawdown', 'avg_drawdown'
     }
 
-    # Print headers
+    # Print headers with the appropriate suffix
     print(f"{headers[0]:<25} | {headers[1]:>15}")
     print("-" * 45)
     
@@ -174,8 +160,13 @@ def print_metrics_table(metrics, convert_to_pct=False):
             value = convert_log_to_pct(metrics.get(metric, 0))
         else:
             value = metrics.get(metric, 0)
-
-        print(f"{metric.replace('_', ' ').title():<25} | {value:>15.4f}")
+        
+        # Get the precision for the current metric, default to `default_precision`
+        precision = metric_precision.get(metric, default_precision)
+        
+        # Format the value with the appropriate precision
+        value_str = f"{value:>{15}.{precision}f}"
+        print(f"{metric.replace('_', ' ').title():<25} | {value_str}")
 
 
 def suggest_params(trial, param_defs):
@@ -284,7 +275,7 @@ def optimize(data, param_defs, indicators, signals_generator, skip_first_fn, bta
         'max_loss': 'minimize',
     }
     
-    long_short = 'long'
+    # long_short = 'long'
     xmult = [1,-1][long_short=='short']
     
     # Set default metrics if none provided
@@ -355,15 +346,18 @@ def comp_backtest(data, param_defs, params, indicators, generate_indicators, sig
     return entry_indices, exit_indices, metrics
 
 
-def plot_strategy(data,metrics,entry_indices,exit_indices,plot_indicators):
+def plot_strategy(data,metrics,entry_indices,exit_indices,plot_indicators,price_only=False,title='', convert_to_pct=False, mult_100=False):
     if len(entry_indices) > 0:
-        print_metrics_table(metrics, convert_to_pct=True)
-        fig_train = plot_performance(entry_indices, exit_indices, metrics,data)
+        print_metrics_table(metrics, convert_to_pct=convert_to_pct, mult_100=mult_100)
+        fig = plot_performance(entry_indices, exit_indices, metrics,data)
+        fig.suptitle(title)
         # if not fig_train is None:
-        plot_indicators(fig_train.get_axes()[0], data)
+        plot_indicators(fig.get_axes()[0], data,price_only=price_only)
         plt.show()
+        return fig
     else:
         print('No Trades.')
+        
         
         
 def plot_performance(entry_indices, exit_indices, metrics, data):
@@ -396,18 +390,19 @@ def plot_performance(entry_indices, exit_indices, metrics, data):
     # Plot the results with the best parameters
 
     
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 10), sharex=True, height_ratios=[2,1])
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 7), sharex=True, height_ratios=[2,1])
 
     # Plot PnL as percentage for long, short, and combined
     ax2.axhline(0, color='black', lw=1)  # Baseline for percentage returns
-    ax2.plot(pnl_pct.index, pnl_pct, label='Combined PNL %/100', color='teal', alpha=0.8, lw=2)
+    # ax2.plot(pnl_pct.index, pnl_pct, label='Combined PNL %/100', color='teal', alpha=0.8, lw=2)
     if len(pnl_pct) > 0:
-        ax2.plot(pnl_pct.index, pnl_pct, label='PNL %/100', color='green', alpha=0.8, lw=2)
+        ax2.plot(pnl_pct.index, pnl_pct * 100, label='PNL %', color='green', alpha=0.8, lw=2)
     # if len(short_trade_indices) > 0:
     #     ax2.plot(short_pnl_pct.index, short_pnl_pct, label='Short PNL %', color='red', alpha=0.8, lw=2)
     
     # ax2.set_yscale('log', base=2)
     ax2.legend(loc='best')
+    ax2.set_title('Strategy performance')
 
     # Plot entry and exit points
     for x in data.index[entry_indices]: 

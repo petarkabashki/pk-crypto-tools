@@ -18,6 +18,14 @@ def load_futures_candles(exchange,base,quote,timeframe):
     return load_json_candles(fname)
 
 
+def load_local_candles(data_dir,fname):
+    fname = f'{data_dir}/{fname}.csv'
+    data = pd.read_csv(fname)
+    data['Date'] = pd.to_datetime(data.Date)
+    data.columns = [c.lower() for c in data.columns]
+    data.set_index('date', inplace=True)
+    return data
+
 def load_index_candles(ticker):
     fname = f'/media/mu6mula/Data/Crypto-Data-Feed/indexes-data/{ticker}.csv'
     data = pd.read_csv(fname)
