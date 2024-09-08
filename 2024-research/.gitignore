@@ -4,3 +4,5 @@ strat_results/
 *.zip
 results/
 *.csv
+*.pkl
+tensorboard_logs/

@@ -1,127 +1,139 @@
 #include <Python.h>
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <bqnffi.h>
 #include <numpy/arrayobject.h>
 
 // Define the eval function that will evaluate BQN code
 static PyObject* pybqn_call(PyObject* self, PyObject* args) {
-    PyObject* numpy_array;
     const char* input_string;
+    PyObject* numpy_array = NULL;
 
-    // Parse the input tuple: expecting a NumPy array and a string
-    if (!PyArg_ParseTuple(args, "sO!", &input_string, &PyArray_Type, &numpy_array)) {
+    // Print start of function
+    printf("Starting pybqn_call...\n");
+
+    // Parse the input tuple: expecting a BQN code string and an optional NumPy array or None
+    if (!PyArg_ParseTuple(args, "s|O", &input_string, &numpy_array)) {
+        printf("Failed to parse arguments.\n");
         return NULL;
     }
 
-    // Ensure the input is indeed a NumPy array
-    if (!PyArray_Check(numpy_array)) {
-        return NULL;
+    // Debug print to confirm parsing
+    printf("Parsed input_string: %s\n", input_string);
+
+    BQNV bqn_arr = 0;  // Default to no array input
+
+    bqn_init();      // Initialize BQN
+    import_array();  // Initialize numpy C-API
+    return PyModule_Create(&bqnmodule);
+}
+
+    // If a NumPy array is provided, convert it to a BQN array
+    if (numpy_array && PyArray_Check(numpy_array)) {
+        PyArrayObject* np_arr = (PyArrayObject*) numpy_array;
+        int rank = PyArray_NDIM(np_arr);
+        npy_intp* shape = PyArray_SHAPE(np_arr);
+        int array_type = PyArray_TYPE(np_arr);
+        void* array_data = PyArray_DATA(np_arr);
+
+        // Convert NumPy array to BQN array
+        switch (array_type) {
+            case NPY_FLOAT:
+            case NPY_DOUBLE:
+                bqn_arr = bqn_makeF64Arr(rank, shape, array_data);
+                break;
+            case NPY_INT:
+            case NPY_LONG:
+                bqn_arr = bqn_makeI32Arr(rank, shape, array_data);
+                break;
+            default:
+                PyErr_SetString(PyExc_TypeError, "Unsupported NumPy array type.");
+                return NULL;
+        }
     }
 
-    // Get the rank (number of dimensions) of the array
-    int rank = PyArray_NDIM((PyArrayObject*)numpy_array);
-    // return PyFloat_FromDouble(rank);
-    // printf('input rank: %i\n',rank);
-    // Get the shape of the array (pointer to an array of npy_intp)
-    npy_intp* shape = PyArray_SHAPE((PyArrayObject*)numpy_array);
-
-    // return PyFloat_FromDouble(shape[0]);
-    // Get the type of the NumPy array
-    int array_type = PyArray_TYPE((PyArrayObject*)numpy_array);
-    // printf('input shape: %i\n',shape[0]);
-    // return shape;
-    void* array_data = PyArray_DATA((PyArrayObject*)numpy_array);
-
-    BQNV bqn_arr;
-    rank = 1;
-    switch (array_type)
-    {
-    case NPY_BOOL:
-    case NPY_BYTE:
-    case NPY_UBYTE:
-        // bqn_arr = bqn_makeI8Arr(rank, shape, PyArray_DATA((PyArrayObject*)numpy_array));
-        // /* code */
-        // break;
-    case NPY_SHORT:
-    case NPY_USHORT:
-        bqn_arr = bqn_makeI16Arr(rank, shape, array_data);
-        /* code */
-        break;
-    case NPY_INT:
-    case NPY_UINT:
-    case NPY_LONG:
-    case NPY_ULONG:
-        bqn_arr = bqn_makeI32Arr(rank, shape, array_data);
-        break;
-    case NPY_LONGLONG:
-    case NPY_ULONGLONG:
-        bqn_arr = bqn_makeI32Arr(rank, shape, PyArray_DATA((PyArrayObject*)numpy_array));
-        break;
-    case NPY_FLOAT:
-    case NPY_DOUBLE:
-    case NPY_LONGDOUBLE:
-    case NPY_CFLOAT:
-    case NPY_CDOUBLE:
-    case NPY_CLONGDOUBLE:
-        bqn_arr = bqn_makeF64Arr(rank, shape, array_data);
-        break;
-    default:
-        bqn_arr = bqn_makeF64Arr(rank, shape, array_data);
-        break;
-    }
-
-    BQN_EXP BQNV xpr = bqn_evalCStr(input_string);
-    BQN_EXP BQNV res = bqn_call1(xpr, bqn_arr);
-
-    if (bqn_type(res) == 1){
-        return PyLong_FromLong(bqn_toF64(res));
-    } else if (bqn_type(res) == 0 ) {
-
-        size_t rrank = bqn_rank(res);
-        size_t rshape[rrank];    
-        bqn_shape(res, rshape);
-
-        npy_intp res_dims[1] = {rshape[0]}; // {10};  // 1D array of length 10
-
-        PyObject* numpy_array_res = PyArray_SimpleNew(1, res_dims, NPY_INT);
-        int* array_data_res = (int*)PyArray_DATA((PyArrayObject*)numpy_array);
-
-        bqn_readI32Arr(res, array_data_res);
-        bqn_free(res);
-        Py_INCREF(numpy_array_res);
-        return Py_BuildValue("O", numpy_array_res);
-
+    // Evaluate the BQN expression
+    BQNV result;
+    if (bqn_arr) {
+        printf("Evaluating BQN expression with NumPy array.\n");
+        result = bqn_call1(bqn_evalCStr(input_string), bqn_arr);  // Use array input
+        bqn_free(bqn_arr);  // Free the BQN array after use
     } else {
+        printf("Evaluating BQN expression without NumPy array.\n");
+        result = bqn_evalCStr(input_string);  // No array input
+    }
+
+    // Check if the evaluation succeeded
+    if (result == 0) {
+        printf("Evaluation failed: result is NULL.\n");
+        PyErr_SetString(PyExc_RuntimeError, "Failed to evaluate BQN expression.");
         return NULL;
     }
 
-}
+    printf("BQN evaluation succeeded.\n");
 
-static PyObject* check_array_type(PyObject* self, PyObject* args) {
-    PyObject* numpy_array;
+    // Handle scalar results (BQN type 1 is scalar)
+    int result_type = bqn_type(result);
+    printf("BQN result type: %d\n", result_type);
 
-    // Parse the input, expecting a NumPy array
-    if (!PyArg_ParseTuple(args, "O!", &PyArray_Type, &numpy_array)) {
-        return NULL;
+    if (result_type == 1) {
+        double scalar_value = bqn_toF64(result);
+        bqn_free(result);  // Free the scalar BQN result
+        printf("Returning scalar value: %f\n", scalar_value);
+        return PyFloat_FromDouble(scalar_value);  // Return the scalar as a Python float
     }
 
-    // Get the type of the NumPy array
-    int array_type = PyArray_TYPE((PyArrayObject*)numpy_array);
-    // NPY_INT
+    // Handle array results
+    if (result_type == 0) {
+        printf("Result is an array.\n");
+        size_t result_rank = bqn_rank(result);
+        npy_intp result_shape[result_rank];
+        bqn_shape(result, result_shape);
 
-    // Return the array type as an integer
-    return Py_BuildValue("i", array_type);
+        // Determine the type of the BQN array
+        BQNElType eltype = bqn_directArrType(result);
+        printf("BQN Element Type: %d\n", eltype);
+
+        PyObject* numpy_array_res = NULL;
+        if (eltype == elt_f64) {
+            // Handle float64 arrays
+            printf("Handling float64 array result.\n");
+            numpy_array_res = PyArray_SimpleNew(result_rank, result_shape, NPY_FLOAT64);
+            double* array_data_res = (double*)PyArray_DATA((PyArrayObject*)numpy_array_res);
+            const double* bqn_data = bqn_directF64(result);
+            memcpy(array_data_res, bqn_data, bqn_bound(result) * sizeof(double));
+        } else if (eltype == elt_i32) {
+            // Handle int32 arrays
+            printf("Handling int32 array result.\n");
+            numpy_array_res = PyArray_SimpleNew(result_rank, result_shape, NPY_INT32);
+            int* array_data_res = (int*)PyArray_DATA((PyArrayObject*)numpy_array_res);
+            const int32_t* bqn_data = bqn_directI32(result);
+            memcpy(array_data_res, bqn_data, bqn_bound(result) * sizeof(int32_t));
+        } else {
+            PyErr_SetString(PyExc_TypeError, "Unsupported BQN array element type.");
+            printf("Unsupported BQN array element type.\n");
+            bqn_free(result);
+            return NULL;
+        }
+
+        bqn_free(result);  // Free the BQN result after use
+        printf("Returning NumPy array result.\n");
+        return numpy_array_res;
+    }
+
+    // If result type is unsupported, return an error
+    printf("Unsupported BQN result type.\n");
+    bqn_free(result);
+    PyErr_SetString(PyExc_TypeError, "Unsupported BQN result type.");
+    return NULL;
 }
 
-// Define the methods that will be available in the Python module
+// Define the Python module
 static PyMethodDef BqnMethods[] = {
-    {"call", pybqn_call, METH_VARARGS, "Evaluate BQN code and return the result as array"},
-    {"check_array_type", check_array_type, METH_VARARGS, "Check and return the type of a NumPy array"},
+    {"call", pybqn_call, METH_VARARGS, "Evaluate BQN code and return the result as a scalar or array"},
     {NULL, NULL, 0, NULL}
 };
 
-// Define the Python module
 static struct PyModuleDef bqnmodule = {
     PyModuleDef_HEAD_INIT,
     "bqn",               // Module name
@@ -132,16 +144,8 @@ static struct PyModuleDef bqnmodule = {
 
 // Initialize the module
 PyMODINIT_FUNC PyInit_bqn(void) {
+    printf("Initializing BQN module...\n");
+    bqn_init();      // Initialize BQN
     import_array();  // Initialize numpy C-API
-    bqn_init();
     return PyModule_Create(&bqnmodule);
 }
-
-/*
-To Compile the extension on Linux run
-
-clear & rm ./bqn.so & gcc -shared -o bqn.so -g -fPIC bqn.c -I$HOME/miniconda3/envs/py310/include/python3.10 -I$HOME/miniconda3/envs/py310/lib/python3.10/site-packages/numpy/core/include -I/media/mu6mula/Data/work/BQN/CBQN-dzaima/include -Wl,-rpath=/media/mu6mula/Data/work/BQN/CBQN-dzaima -lcbqn
-
-*/
-
-// export LD_LIBRARY_PATH=/media/mu6mula/Data/work/BQN/CBQN-dzaima:$LD_LIBRARY_PATH
