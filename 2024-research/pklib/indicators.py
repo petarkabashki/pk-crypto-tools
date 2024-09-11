@@ -197,8 +197,25 @@ def donchian(data, period):
     """Calculates Donchian channel average."""
     return (data['low'].rolling(window=period).min() + data['high'].rolling(window=period).max()) / 2
 
-def ichimoku_cloud_indicator(df, conversion_periods=9, base_periods=26, lagging_span2_periods=52, displacement=26):
-    """Calculates Ichimoku Cloud lines and returns as a DataFrame."""
+def ichimoku_cloud_indicator(df, params, add_to_original=False):
+    default_params = {
+        'conversion_periods': 9,
+        'base_periods': 26,
+        'lagging_span2_periods': 52,
+        'displacement': 26
+    }
+    
+    # If a params dictionary is provided, override the default values
+    if params:
+        ichimoku_params = {**default_params, **params}
+    else:
+        ichimoku_params = default_params
+    
+    # Extract parameters from the dictionary
+    conversion_periods = ichimoku_params['conversion_periods']
+    base_periods = ichimoku_params['base_periods']
+    lagging_span2_periods = ichimoku_params['lagging_span2_periods']
+    displacement = ichimoku_params['displacement']
     
     # Conversion Line (Tenkan-sen)
     conversion_line = donchian(df, conversion_periods)
@@ -223,16 +240,24 @@ def ichimoku_cloud_indicator(df, conversion_periods=9, base_periods=26, lagging_
     kumo_upper = np.where(lead_line1_shifted > lead_line2_shifted, lead_line1_shifted, lead_line2_shifted)
     kumo_lower = np.where(lead_line1_shifted < lead_line2_shifted, lead_line1_shifted, lead_line2_shifted)
     
-    # Return the indicator lines as a DataFrame
-    return pd.DataFrame({
+    # Create a DataFrame with the indicator lines
+    ichimoku_df = pd.DataFrame({
         'tenkan': conversion_line,
         'kijun': base_line,
-        # 'Lagging Span': lagging_span,
         'lead_span_A': lead_line1_shifted,
         'lead_span_B': lead_line2_shifted,
         'kumo_upper': kumo_upper,
         'kumo_lower': kumo_lower
     }, index=df.index)
+    
+    # If add_to_original is True, merge the new columns into the original DataFrame
+    if add_to_original:
+        df.loc[:,ichimoku_df.columns] = ichimoku_df
+        # return pd.concat([df, ichimoku_df], axis=1)
+    
+    # Otherwise, return only the DataFrame with the indicators
+    return ichimoku_df
+
 
 def plot_ichimoku_cloud(df, ichimoku_data):
     """Plots the Ichimoku Cloud using the calculated lines."""
