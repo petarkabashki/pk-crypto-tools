@@ -6,3 +6,5 @@ results/
 *.csv
 *.pkl
 tensorboard_logs/
+models/
+plots/

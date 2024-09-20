@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
 
-from pkindicators import calculate_zigzag
+# from pkindicators import calculate_zigzag
 
 def create_comparison_features(df, column_groups):
     """
@@ -31,7 +31,7 @@ def create_comparison_features(df, column_groups):
 
     return new_features
 
-def create_moving_average_features(df, ema_periods, sma_periods, column='close'):
+def create_moving_average_features(df, ema_periods, sma_periods, column='close', add_to_original=False):
     """
     This function takes a DataFrame and two separate lists of periods for EMAs and SMAs, and returns a new DataFrame 
     containing both Exponential Moving Averages (EMAs) and Simple Moving Averages (SMAs) for the specified periods.
@@ -46,7 +46,10 @@ def create_moving_average_features(df, ema_periods, sma_periods, column='close')
     pd.DataFrame: A new DataFrame containing both EMA and SMA features for each period with the same index as the input DataFrame.
     """
     # Initialize a DataFrame to store the moving average features
-    ma_features = pd.DataFrame(index=df.index)
+    if add_to_original:
+        ma_features = df
+    else:
+        ma_features = pd.DataFrame(index=df.index)
     
     # Calculate EMA for each period and add to the new DataFrame
     for period in ema_periods:
@@ -126,78 +129,75 @@ def add_bollinger_bands(df, periods, multiplier=2):
 
     return df
 
-epsilon = 0.2
+# epsilon = 0.2
 
-# fib_levels = np.array([-1.0, -0.786, -0.618, -0.5, -0.382, -0.236, 0.0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.236, 1.5, 1.618, 1.786, 2.0, 2.236, 2.382, 2.5, 2.628, 2.786, 3, 3.382, 3.618, 4, 5])
-fib_levels = np.array([-1.0, -0.618, -0.236, 0.0, 0.236, 0.5, 0.618, 0.786, 1.0, 1.236, 1.618, 2.0, 2.5, 3, 4, 5])
+# # fib_levels = np.array([-1.0, -0.786, -0.618, -0.5, -0.382, -0.236, 0.0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.236, 1.5, 1.618, 1.786, 2.0, 2.236, 2.382, 2.5, 2.628, 2.786, 3, 3.382, 3.618, 4, 5])
+# fib_levels = np.array([-1.0, -0.618, -0.236, 0.0, 0.236, 0.5, 0.618, 0.786, 1.0, 1.236, 1.618, 2.0, 2.5, 3, 4, 5])
 
-fib_columns = [f'fib({fib})' for fib in fib_levels]
-# fib_columns 
+# fib_columns = [f'fib({fib})' for fib in fib_levels]
+# # fib_columns 
 
-def calculate_fib_levels(highs, lows, directions, fib_levels=fib_levels):
-    # Ensure highs, lows, and directions are numpy arrays
-    highs = np.asarray(highs)
-    lows = np.asarray(lows)
-    directions = np.asarray(directions)
+# def calculate_fib_levels(highs, lows, directions, fib_levels=fib_levels):
+#     # Ensure highs, lows, and directions are numpy arrays
+#     highs = np.asarray(highs)
+#     lows = np.asarray(lows)
+#     directions = np.asarray(directions)
 
-    # Flip highs and lows based on direction (-1 means flip)
-    adjusted_highs = np.where(directions == 1, highs, lows)
-    adjusted_lows = np.where(directions == 1, lows, highs)
+#     # Flip highs and lows based on direction (-1 means flip)
+#     adjusted_highs = np.where(directions == 1, highs, lows)
+#     adjusted_lows = np.where(directions == 1, lows, highs)
 
-    # Calculate the difference between adjusted high and low
-    diff = adjusted_highs - adjusted_lows
+#     # Calculate the difference between adjusted high and low
+#     diff = adjusted_highs - adjusted_lows
 
-    # Calculate the Fibonacci levels by applying the levels to the differences
-    fib_matrix = np.outer(diff, fib_levels)
+#     # Calculate the Fibonacci levels by applying the levels to the differences
+#     fib_matrix = np.outer(diff, fib_levels)
     
-    # Calculate the actual levels by adding them to the low (base) level
-    fib_levels_array = adjusted_lows[:, np.newaxis] + fib_matrix
+#     # Calculate the actual levels by adding them to the low (base) level
+#     fib_levels_array = adjusted_lows[:, np.newaxis] + fib_matrix
 
-    return fib_levels_array
+#     return fib_levels_array
 
 
-def get_fib_data(asset, quote, timeframe, exchange):
-    # asset, quote, timeframe, exchange = 'BTC', 'USDT', '8h', 'binance'
-    data = load_candles('binance',asset, quote, timeframe)#['2020':'2024']#.iloc[-35000:-5000]
+# def get_fib_data(asset, quote, timeframe, exchange):
+#     # asset, quote, timeframe, exchange = 'BTC', 'USDT', '8h', 'binance'
+#     data = load_candles('binance',asset, quote, timeframe)#['2020':'2024']#.iloc[-35000:-5000]
         
-    # Call the calculate_zigzag function from the C module
-    high_low_markers, turning_points = calculate_zigzag(data['close'].values, epsilon=epsilon)
+#     # Call the calculate_zigzag function from the C module
+#     high_low_markers, turning_points = calculate_zigzag(data['close'].values, epsilon=epsilon)
 
-    # Store the results back into the DataFrame for easier plotting
-    # data['HighLowMarkers'] = high_low_markers
-    # data['TurningPoints'] = turning_points
+#     # Store the results back into the DataFrame for easier plotting
+#     # data['HighLowMarkers'] = high_low_markers
+#     # data['TurningPoints'] = turning_points
 
-    # Get the indices of highs and lows
-    # highs_idx = data.index[data['HighLowMarkers'] == 1]
-    # lows_idx = data.index[data['HighLowMarkers'] == -1]
-    highs_idx = data.index[high_low_markers == 1]
-    lows_idx = data.index[turning_points == -1]
+#     # Get the indices of highs and lows
+#     # highs_idx = data.index[data['HighLowMarkers'] == 1]
+#     # lows_idx = data.index[data['HighLowMarkers'] == -1]
+#     highs_idx = data.index[high_low_markers == 1]
+#     lows_idx = data.index[turning_points == -1]
 
-    running_highs = (np.where(high_low_markers == 1, 1, np.nan) * data['close']).ffill()
-    running_lows = (np.where(high_low_markers == -1, 1, np.nan) * data['close']).ffill()
+#     running_highs = (np.where(high_low_markers == 1, 1, np.nan) * data['close']).ffill()
+#     running_lows = (np.where(high_low_markers == -1, 1, np.nan) * data['close']).ffill()
 
 
-    running_highs_idx = pd.Series(np.where(high_low_markers == 1, 1, np.nan) * np.arange(len(data))).set_axis(data.index).ffill()
-    running_lows_idx = pd.Series(np.where(high_low_markers == -1, 1, np.nan) * np.arange(len(data))).set_axis(data.index).ffill()
+#     running_highs_idx = pd.Series(np.where(high_low_markers == 1, 1, np.nan) * np.arange(len(data))).set_axis(data.index).ffill()
+#     running_lows_idx = pd.Series(np.where(high_low_markers == -1, 1, np.nan) * np.arange(len(data))).set_axis(data.index).ffill()
 
-    # Combine the indices and sort them
-    turning_points_idx = sorted(highs_idx.union(lows_idx))
+#     # Combine the indices and sort them
+#     turning_points_idx = sorted(highs_idx.union(lows_idx))
 
-    # Assuming calculate_fib_levels is defined elsewhere in your code
-    fibs = calculate_fib_levels(running_lows, running_highs, ((running_highs_idx > running_lows_idx) * 2 - 1))
+#     # Assuming calculate_fib_levels is defined elsewhere in your code
+#     fibs = calculate_fib_levels(running_lows, running_highs, ((running_highs_idx > running_lows_idx) * 2 - 1))
 
-    df_fibs = data.join(pd.DataFrame(fibs, columns=fib_columns, index=data.index))
-    return df_fibs.dropna()
+#     df_fibs = data.join(pd.DataFrame(fibs, columns=fib_columns, index=data.index))
+#     return df_fibs.dropna()
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 
 def donchian(data, period):
     """Calculates Donchian channel average."""
     return (data['low'].rolling(window=period).min() + data['high'].rolling(window=period).max()) / 2
 
-def ichimoku_cloud_indicator(df, params, add_to_original=False):
+def add_ichimoku_cloud_indicator(df, params, add_to_original=True):
     default_params = {
         'conversion_periods': 9,
         'base_periods': 26,
@@ -296,3 +296,250 @@ def plot_ichimoku_cloud(df, ichimoku_data):
     plt.grid()
     plt.show()
 
+
+
+def add_rsi_columns(df, periods):
+    """
+    Adds RSI columns to the DataFrame for the specified periods.
+
+    Parameters:
+    - df (pandas.DataFrame): Input DataFrame with a 'close' column.
+    - periods (list or array): Array of periods for calculating RSI.
+
+    Returns:
+    - pandas.DataFrame: DataFrame with added RSI columns.
+    """
+    for period in periods:
+        rsi_column_name = f'RSI_{period}'
+        df[rsi_column_name] = talib.RSI(df['close'], timeperiod=period)
+    
+    return df
+
+
+
+def add_adx_columns(df, periods):
+    """
+    Adds ADX columns to the DataFrame for the specified periods.
+    
+    Parameters:
+    - df (pandas.DataFrame): Input DataFrame with 'high', 'low', 'close' columns.
+    - periods (list or array): Array of periods for calculating ADX.
+    
+    Returns:
+    - pandas.DataFrame: DataFrame with added ADX columns.
+    """
+    for period in periods:
+        adx_column_name = f'ADX_{period}'
+        df[adx_column_name] = talib.ADX(df['high'], df['low'], df['close'], timeperiod=period)
+    
+    return df
+
+
+def add_roc_columns(df, periods):
+    """
+    Adds ROC columns to the DataFrame for the specified periods.
+    
+    Parameters:
+    - df (pandas.DataFrame): Input DataFrame with a 'close' column.
+    - periods (list or array): Array of periods for calculating ROC.
+    
+    Returns:
+    - pandas.DataFrame: DataFrame with added ROC columns.
+    """
+    for period in periods:
+        roc_column_name = f'ROC_{period}'
+        df[roc_column_name] = talib.ROC(df['close'], timeperiod=period)
+    
+    return df
+
+def add_mom_columns(df, periods):
+    """
+    Adds MOM columns to the DataFrame for the specified periods.
+    
+    Parameters:
+    - df (pandas.DataFrame): Input DataFrame with a 'close' column.
+    - periods (list or array): Array of periods for calculating Momentum.
+    
+    Returns:
+    - pandas.DataFrame: DataFrame with added MOM columns.
+    """
+    for period in periods:
+        mom_column_name = f'MOM_{period}'
+        df[mom_column_name] = talib.MOM(df['close'], timeperiod=period)
+    
+    return df
+
+
+def add_std_columns(df, periods):
+    """
+    Adds STD (Standard Deviation) columns to the DataFrame for the specified periods.
+    
+    Parameters:
+    - df (pandas.DataFrame): Input DataFrame with a 'close' column.
+    - periods (list or array): Array of periods for calculating STD.
+    
+    Returns:
+    - pandas.DataFrame: DataFrame with added STD columns.
+    """
+    for period in periods:
+        std_column_name = f'STD_{period}'
+        df[std_column_name] = talib.STDDEV(df['close'], timeperiod=period, nbdev=1)
+    
+    return df
+
+def add_donchian_columns(df, periods, low_col='low', high_col='high'):
+    """
+    Adds Donchian channel average columns to the DataFrame for the specified periods and custom low/high columns.
+    
+    Parameters:
+    - df (pandas.DataFrame): Input DataFrame with 'low' and 'high' columns (or specified custom columns).
+    - periods (list or array): Array of periods for calculating Donchian channel averages.
+    - low_col (str): Name of the column representing low prices.
+    - high_col (str): Name of the column representing high prices.
+    
+    Returns:
+    - pandas.DataFrame: DataFrame with added Donchian channel average columns.
+    """
+    for period in periods:
+        donchian_column_name = f'Donchian_{period}'
+        df[donchian_column_name] = (df[low_col].rolling(window=period).min() + 
+                                    df[high_col].rolling(window=period).max()) / 2
+    
+    return df
+
+def add_rolling_max_columns(df, periods, column='close'):
+    """
+    Adds rolling maximum columns to the DataFrame for the specified periods and custom column.
+    
+    Parameters:
+    - df (pandas.DataFrame): Input DataFrame.
+    - periods (list or array): Array of periods for calculating rolling maximums.
+    - column (str): Name of the column to calculate rolling maximum.
+    
+    Returns:
+    - pandas.DataFrame: DataFrame with added rolling maximum columns.
+    """
+    for period in periods:
+        max_column_name = f'RollingMax_{period}'
+        df[max_column_name] = df[column].rolling(window=period).max()
+    
+    return df
+
+def add_rolling_min_columns(df, periods, column='close'):
+    """
+    Adds rolling minimum columns to the DataFrame for the specified periods and custom column.
+    
+    Parameters:
+    - df (pandas.DataFrame): Input DataFrame.
+    - periods (list or array): Array of periods for calculating rolling minimums.
+    - column (str): Name of the column to calculate rolling minimum.
+    
+    Returns:
+    - pandas.DataFrame: DataFrame with added rolling minimum columns.
+    """
+    for period in periods:
+        min_column_name = f'RollingMin_{period}'
+        df[min_column_name] = df[column].rolling(window=period).min()
+    
+    return df
+import talib
+
+def add_ema_columns(df, periods, column='close'):
+    """
+    Adds EMA (Exponential Moving Average) columns to the DataFrame for the specified periods and custom column.
+    
+    Parameters:
+    - df (pandas.DataFrame): Input DataFrame.
+    - periods (list or array): Array of periods for calculating EMAs.
+    - column (str): Name of the column to calculate EMAs.
+    
+    Returns:
+    - pandas.DataFrame: DataFrame with added EMA columns.
+    """
+    for period in periods:
+        ema_column_name = f'EMA_{period}'
+        df[ema_column_name] = talib.EMA(df[column], timeperiod=period)
+    
+    return df
+import talib
+
+def add_sma_columns(df, periods, column='close'):
+    """
+    Adds SMA (Simple Moving Average) columns to the DataFrame for the specified periods and custom column.
+    
+    Parameters:
+    - df (pandas.DataFrame): Input DataFrame.
+    - periods (list or array): Array of periods for calculating SMAs.
+    - column (str): Name of the column to calculate SMAs.
+    
+    Returns:
+    - pandas.DataFrame: DataFrame with added SMA columns.
+    """
+    for period in periods:
+        sma_column_name = f'SMA_{period}'
+        df[sma_column_name] = talib.SMA(df[column], timeperiod=period)
+    
+    return df
+
+import numpy as np
+import talib
+
+def log_price_over_ma_columns(df, periods, price_col='close', ma_type='ema'):
+    """
+    Calculates the log of (price / MA) for each period in the provided list.
+    
+    Parameters:
+    - df (pandas.DataFrame): Input DataFrame containing the price column.
+    - periods (list or array): List of periods for calculating the moving average.
+    - price_col (str): Name of the column containing the price data.
+    - ma_type (str): Type of moving average to use ('ema' for Exponential, 'sma' for Simple).
+    
+    Returns:
+    - pandas.DataFrame: DataFrame with columns containing log(price / MA) for each period.
+    """
+    # result_df = df.copy()  # Make a copy of the original DataFrame
+    result_df = df
+    
+    for period in periods:
+        if ma_type == 'ema':
+            ma = talib.EMA(df[price_col], timeperiod=period)  # Calculate EMA
+        elif ma_type == 'sma':
+            ma = talib.SMA(df[price_col], timeperiod=period)  # Calculate SMA
+        else:
+            raise ValueError("Invalid ma_type. Use 'ema' for Exponential or 'sma' for Simple.")
+        
+        # Ensure no division by zero and calculate log(price / MA)
+        log_price_ma = np.log(df[price_col] / ma)
+        
+        # Handle cases where the MA is zero or invalid by replacing them with NaN
+        log_price_ma = log_price_ma.replace([np.inf, -np.inf], np.nan).fillna(0)
+        
+        # Add the result as a new column
+        result_df[f'log_{price_col}_over_{ma_type}_{period}'] = log_price_ma
+    
+    return result_df
+
+def add_shifted_columns(df, periods, columns=None, suffix=""):
+    """
+    Shifts the specified columns forward based on the periods array and adds the shifted columns to the DataFrame.
+
+    Parameters:
+    - df (pandas.DataFrame): Input DataFrame.
+    - periods (list or array): List of periods for shifting the columns forward.
+    - columns (list or array): List of column names to be shifted.
+
+    Returns:
+    - pandas.DataFrame: The original DataFrame with new shifted columns for each period.
+    """
+    if columns is None:
+        columns = df.columns.values
+    # result_df = df.copy()  # Make a copy of the original DataFrame
+    result_df = df
+    
+    for period in periods:
+        for col in columns:
+            # Shift the column forward by the specified period
+            shifted_col_name = f'{col}_shifted_{period}{suffix}'
+            result_df[shifted_col_name] = df[col].shift(periods=period)
+    
+    return result_df
