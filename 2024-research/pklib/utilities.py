@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 # from pkindicators import *
 
+# /media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data
+base_data_folder = '~/quant/data-misc'
+
 def load_json_candles(fname):
     data = pd.read_json(fname)
     data.columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
@@ -10,11 +13,11 @@ def load_json_candles(fname):
     return data
 
 def load_candles(exchange,base,quote,timeframe):
-    fname = f'/media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data/{exchange}/{base}_{quote}-{timeframe}.json'
+    fname = f'{base_data_folder}/{exchange}/{base}_{quote}-{timeframe}.json'
     return load_json_candles(fname)
 
 def load_futures_candles(exchange,base,quote,timeframe):
-    fname = f'/media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data/{exchange}/futures/{base}_{quote}_{quote}-{timeframe}-futures.json'
+    fname = f'{base_data_folder}/{exchange}/futures/{base}_{quote}_{quote}-{timeframe}-futures.json'
     return load_json_candles(fname)
 
 
