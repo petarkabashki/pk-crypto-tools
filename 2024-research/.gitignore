@@ -8,3 +8,4 @@ results/
 tensorboard_logs/
 models/
 plots/
+*.joblib
