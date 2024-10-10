@@ -31,7 +31,7 @@ import talib
 from pklib.utilities import *
 # from pklib.pkindicators import calculate_zigzag
 from pklib.indicators import *
-import seaborn as sns
+
 # from sklearn.metrics import confusion_matrix
 # from sklearn.metrics import confusion_matrix
 # from sklearn.metrics import precision_score, recall_score
@@ -69,14 +69,14 @@ print(f"Using device: {device}")
 
 #%%
 
-def get_signal(df, lookback_period, target_period, min_target_pct, risk_2_reward, max_capital, lookback_column='low'):
+def get_signal(df, lookback_period, target_period, min_target_pct, risk_2_reward):
     fwd_min = df.low.rolling(target_period).min().shift(-target_period)
     fwd_max = df.high.rolling(target_period).max().shift(-target_period)
     fwd_rwd_pct = (fwd_max / df.close) - 1    
-    stoploss = df[lookback_column].rolling(lookback_period).min()#.mul(0.995)
+    stoploss = df['low'].rolling(lookback_period).min()#.mul(0.995)
     
     risk_pct = df.close / stoploss - 1
-    target_pct = risk_pct * risk_2_reward
+    target_pct = risk_pct / risk_2_reward
     target = df.close * (1 + target_pct)
     
     # Calculate the required capital for each trade
@@ -92,32 +92,6 @@ def get_signal(df, lookback_period, target_period, min_target_pct, risk_2_reward
 
 #%%
 
-# # Declare parameters for get_signal
-# lookback_period = 14
-# target_period = 20
-# min_target_pct = 0.02
-# risk_2_reward = 2
-# max_capital = 10000  # Assuming a maximum capital of $10,000 per trade
-# lookback_column = 'low'
-# df = df_ohlcv
-
-# # Call get_signal function
-# Y, (stoploss, target), (risk_pct, target_pct, required_capital) = get_signal(
-#     df, 
-#     lookback_period, 
-#     target_period, 
-#     min_target_pct, 
-#     risk_2_reward, 
-#     max_capital, 
-#     lookback_column
-# )
-
-# # Print or process the results as needed
-# print("Signal generated:")
-# print(f"Number of positive signals: {Y.sum()}")
-# print(f"Average risk percentage: {risk_pct.mean():.2%}")
-# print(f"Average target percentage: {target_pct.mean():.2%}")
-# print(f"Average required capital: ${required_capital.mean():.2f}")
 
 #%%
 
@@ -182,11 +156,11 @@ from pklib.utilities import load_candles
 exchange = 'binance'
 asset = 'BTC'
 quote = 'USDT'
-timeframe = '4h'
+timeframe = '8h'
 df = load_candles(exchange, asset, quote, timeframe)
 
 # Define periods for moving averages and standard deviation
-periods = [3, 5, 7, 10, 14, 17, 21, 30, 50, 80, 100, 200]
+periods = [3, 4, 5, 6, 7, 8, 9, 10, 14, 17, 21, 30, 50, 80, 100, 200]
 
 # Calculate indicators
 indicators = {
@@ -236,74 +210,56 @@ normalized_columns = normalized_columns.tolist()
 
 #%%
 # df_all_normalized['open'] = 1e-8
-# normalized_columns
+normalized_columns
 # df_ohlcv
-#%%
-
-
-def print_performance_table(model, X, y, threshold=0.5, set_name=""):
-    model.eval()
-    with torch.no_grad():
-        outputs = model(X)
-        preds = (torch.sigmoid(outputs.squeeze()) > threshold).float()
-        
-        y_np = y.cpu().numpy()
-        preds_np = preds.cpu().numpy()
-        
-        precision = precision_score(y_np, preds_np)
-        recall = recall_score(y_np, preds_np)
-        f1 = f1_score(y_np, preds_np)
-        accuracy = accuracy_score(y_np, preds_np)
-        cm = confusion_matrix(y_np, preds_np)
-
-        metrics_table = [
-            ["Metric", "Value"],
-            ["Accuracy", f"{accuracy:.4f}"],
-            ["Precision", f"{precision:.4f}"],
-            ["Recall", f"{recall:.4f}"],
-            ["F1-score", f"{f1:.4f}"]
-        ]
-
-        cm_table = [
-            ["", "Predicted Negative", "Predicted Positive"],
-            ["Actual Negative", cm[0][0], cm[0][1]],
-            ["Actual Positive", cm[1][0], cm[1][1]]
-        ]
-
-        print(f"\n{set_name} Performance Metrics:")
-        print(tabulate(metrics_table, headers="firstrow", tablefmt="grid"))
-
-        print(f"\n{set_name} Confusion Matrix:")
-        print(tabulate(cm_table, headers="firstrow", tablefmt="grid"))
-
-    model.train()
-    return precision, recall, f1
-
 #%%
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.optim.lr_scheduler import StepLR, LambdaLR
-from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler, random_split
-from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
-from tabulate import tabulate
-from imblearn.over_sampling import SMOTE
-from torch.optim.lr_scheduler import OneCycleLR
-class SimpleGRUModel(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, output_size, dropout=0.3):
-        super(SimpleGRUModel, self).__init__()
+from torch.nn import functional as F
+from torch.utils.data import TensorDataset, DataLoader
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import LambdaLR
+from sklearn.model_selection import train_test_split
+import numpy as np
+import seaborn as sns
+# Define the GRU model
+class GRUModel(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, fc_layers, output_size, dropout=0.5):
+        super(GRUModel, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.gru = nn.GRU(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout)
-        self.fc = nn.Linear(hidden_size, output_size)
+        
+        # Batch normalization after GRU
+        self.bn_gru = nn.BatchNorm1d(hidden_size)
+        
+        # Create fc layers based on the input array
+        self.fc_layers = nn.ModuleList()
+        self.bn_layers = nn.ModuleList()
+        in_features = hidden_size
+        for out_features in fc_layers:
+            self.fc_layers.append(nn.Linear(in_features, out_features))
+            self.bn_layers.append(nn.BatchNorm1d(out_features))
+            in_features = out_features
+        
+        # Final output layer
+        self.fc_out = nn.Linear(in_features, output_size)
+        
+        self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         out, _ = self.gru(x, h0)
-        out = self.dropout(out[:, -1, :])
-        out = self.fc(out)
+        out = out[:, -1, :]  # Take the output from the last time step
+        out = self.bn_gru(out)
+        
+        # Apply fc layers with batch normalization
+        for fc, bn in zip(self.fc_layers, self.bn_layers):
+            out = self.dropout(self.relu(bn(fc(out))))
+        
+        out = self.fc_out(out)
         return out
 
 # Use the existing get_signal function with sample parameters
@@ -311,12 +267,10 @@ class SimpleGRUModel(nn.Module):
 lookback_period = 8
 holding_period = 6
 threshold = 0.01
-direction = 2.5
-initial_capital = 10000
-lookback_column = 'low'
+risk_2_reward = 1 / 3
 
 # Call get_signal function with pre-declared arguments
-y, _, _ = get_signal(df_ohlcv, lookback_period, holding_period, threshold, direction, initial_capital, lookback_column=lookback_column)
+y, _, _ = get_signal(df_ohlcv, lookback_period, holding_period, threshold, risk_2_reward=risk_2_reward)
 
 # Prepare the data
 X = df_all_normalized.values
@@ -334,130 +288,108 @@ for i in range(len(X) - sequence_length):
 X_seq = np.array(X_seq)
 y_seq = np.array(y_seq)
 
-# Assuming X and y are your full dataset
-# First, split into train+val and test sets
-X_train_val, X_test, y_train_val, y_test = train_test_split(X_seq, y_seq, test_size=0.2, random_state=42)
-
-# Then split train+val into train and validation sets
-X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.2, random_state=42)
+# Split the data
+X_train, X_test, y_train, y_test = train_test_split(X_seq, y_seq, test_size=0.3, random_state=42)
 
 # Convert to PyTorch tensors and move to the appropriate device
 X_train = torch.FloatTensor(X_train).to(device)
 y_train = torch.FloatTensor(y_train).to(device)
-X_val = torch.FloatTensor(X_val).to(device)
-y_val = torch.FloatTensor(y_val).to(device)
 X_test = torch.FloatTensor(X_test).to(device)
 y_test = torch.FloatTensor(y_test).to(device)
 
-print("Label type:", y_train.dtype)
-print("Unique labels:", torch.unique(y_train))
-print("Label distribution:", torch.bincount(y_train.long()))
-
-# Create DataLoader for training data
+# Create DataLoader
 train_data = TensorDataset(X_train, y_train)
-train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
-
-#%%
+train_loader = DataLoader(train_data, batch_size=512, shuffle=False)
 
 #%%
 # Initialize the model and move it to the appropriate device
 input_size = X_train.shape[2]
 print(f'input_size: {input_size}')
 
-# Hyperparameters
-hidden_size = 64
-num_layers = 1
-batch_size = 256  # Increased batch size
-learning_rate = 0.001
-num_epochs = 100
-weight_decay = 1e-5
-warmup_epochs = 5  # Number of epochs for warmup
-
 # Initialize the model, criterion, and optimizer
-model = SimpleGRUModel(input_size, hidden_size=hidden_size, num_layers=num_layers, output_size=1, dropout=0.3).to(device)
+# hidden_size = input_size *2  # Set hidden size to twice the number of features
+# fc_layers = [input_size // 2]  # Decreasing sizes based on input size
+hidden_size = 256
+fc_layers = [32]  
+model = GRUModel(input_size, hidden_size=hidden_size, num_layers=1, fc_layers=fc_layers, output_size=1, dropout=0.2).to(device)
 
-# Lower initial learning rate
-initial_lr = 1e-4
-optimizer = torch.optim.Adam(model.parameters(), lr=initial_lr, weight_decay=weight_decay)
 
-# Learning rate scheduler with warmup
+# Increase the weight for the positive class
+pos_weight = torch.tensor([(len(y_train) - y_train.sum()) / y_train.sum() * 2]).to(device)  # Multiply by 2 or more
+# criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+
+def focal_loss(pred, target, alpha=0.25, gamma=2):
+    bce_loss = F.binary_cross_entropy_with_logits(pred, target, reduction='none')
+    pt = torch.exp(-bce_loss)
+    focal_loss = alpha * (1-pt)**gamma * bce_loss
+    return focal_loss.mean()
+
+criterion = focal_loss
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-6)
+
+
 def warmup_lambda(epoch):
-    if epoch < warmup_epochs:
-        return float(epoch) / float(max(1, warmup_epochs))
+    if epoch < 50:
+        return 0.1 * (epoch + 1)
     return 1.0
 
-# scheduler = LambdaLR(optimizer, lr_lambda=warmup_lambda)
+scheduler = LambdaLR(optimizer, lr_lambda=warmup_lambda)
+# scheduler = CosineAnnealingLR(optimizer, T_max=100, eta_min=1e-6)
+# scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=10, factor=0.1, min_lr=1e-6)
+# Add gradient norm tracking
+grad_norms = []
 
-scheduler = OneCycleLR(optimizer, max_lr=0.01, epochs=num_epochs, steps_per_epoch=len(train_loader))
+# Add this before the training loop
+accumulation_steps = 5  # Adjust as needed
 
-# Reshape X_train for SMOTE
-X_train_reshaped = X_train.view(X_train.shape[0], -1).cpu().numpy()
-y_train_np = y_train.cpu().numpy()
-
-# Apply SMOTE
-smote = SMOTE(random_state=42)
-X_train_resampled, y_train_resampled = smote.fit_resample(X_train_reshaped, y_train_np)
-
-# Reshape back to sequence form
-X_train_resampled = torch.FloatTensor(X_train_resampled.reshape(-1, sequence_length, input_size)).to(device)
-y_train_resampled = torch.FloatTensor(y_train_resampled).to(device)
-
-# Create new DataLoader with resampled data
-train_data = TensorDataset(X_train_resampled, y_train_resampled)
-train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
-
-# Class weights (if needed after SMOTE)
-pos_weight = (y_train_resampled == 0).sum() / (y_train_resampled == 1).sum()
-criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([pos_weight]).to(device))
-
-# Dynamic threshold
-def find_best_threshold(outputs, labels):
-    best_threshold = 0
-    best_f1 = 0
-    for threshold in np.arange(0.1, 0.9, 0.1):
-        preds = (torch.sigmoid(outputs) > threshold).float()
-        f1 = f1_score(labels.cpu().numpy(), preds.cpu().numpy())
-        if f1 > best_f1:
-            best_f1 = f1
-            best_threshold = threshold
-    return best_threshold
-
-# Training loop
-best_val_f1 = 0
-patience = 50
+# Modify the training loop
+num_epochs = 300
+train_losses = []
+best_loss = float('inf')
+patience = 70
 counter = 0
 best_model = None
-threshold = 0.5
 
 for epoch in range(num_epochs):
     model.train()
     epoch_loss = 0.0
+    batch_grad_norms = []
+    optimizer.zero_grad()  # Move this outside the batch loop
     
-    for batch_X, batch_y in train_loader:
+    for i, (batch_X, batch_y) in enumerate(train_loader):
         batch_X, batch_y = batch_X.to(device), batch_y.to(device)
-        optimizer.zero_grad()
         outputs = model(batch_X)
-        loss = criterion(outputs.squeeze(), batch_y)
+        loss = criterion(outputs.squeeze(), batch_y) / accumulation_steps
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        optimizer.step()
-        epoch_loss += loss.item()
+        
+        # Track gradient norms
+        total_norm = 0
+        for p in model.parameters():
+            if p.grad is not None:
+                param_norm = p.grad.data.norm(2)
+                total_norm += param_norm.item() ** 2
+        total_norm = total_norm ** 0.5
+        batch_grad_norms.append(total_norm)
+        
+        if (i + 1) % accumulation_steps == 0 or (i + 1) == len(train_loader):
+            # Gradient clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
+            
+            optimizer.step()
+            optimizer.zero_grad()
+        
+        epoch_loss += loss.item() * accumulation_steps
     
-    avg_train_loss = epoch_loss / len(train_loader)
+    avg_loss = epoch_loss / len(train_loader)
+    train_losses.append(avg_loss)
+    grad_norms.append(np.mean(batch_grad_norms))
     
-    # Validation step
-    model.eval()
-    with torch.no_grad():
-        val_outputs = model(X_val)
-        threshold = find_best_threshold(val_outputs, y_val)
-        val_preds = (torch.sigmoid(val_outputs.squeeze()) > threshold).float()
-        val_f1 = f1_score(y_val.cpu().numpy(), val_preds.cpu().numpy())
-        val_precision = precision_score(y_val.cpu().numpy(), val_preds.cpu().numpy())
+    # Learning rate scheduling
+    scheduler.step(avg_loss)
     
-    scheduler.step()
-    
-    if val_f1 > best_val_f1:
-        best_val_f1 = val_f1
+    # Early stopping check
+    if avg_loss < best_loss:
+        best_loss = avg_loss
         counter = 0
         best_model = model.state_dict()
     else:
@@ -466,79 +398,36 @@ for epoch in range(num_epochs):
             print(f'Early stopping at epoch {epoch+1}')
             break
     
-    print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {avg_train_loss:.6f}, '
-          f'Val F1: {val_f1:.4f}, Val Precision: {val_precision:.4f}, '
-          f'Threshold: {threshold:.4f}, LR: {optimizer.param_groups[0]["lr"]:.2e}')
+    if (epoch + 1) % 10 == 0:
+        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.6f}, '
+              f'LR: {optimizer.param_groups[0]["lr"]:.2e}, '
+              f'Grad Norm: {grad_norms[-1]:.4f}')
 
 # Load the best model
-if best_model is not None:
-    model.load_state_dict(best_model)
-else:
-    print("Warning: No best model was saved. Using the final model state.")
-    
-# Evaluation function
-def print_combined_performance_table(model, X_train, y_train, X_test, y_test, threshold=0.5):
-    model.eval()
-    with torch.no_grad():
-        # Training data evaluation
-        train_outputs = model(X_train)
-        train_preds = (torch.sigmoid(train_outputs.squeeze()) > threshold).float()
-        
-        # Test data evaluation
-        test_outputs = model(X_test)
-        test_preds = (torch.sigmoid(test_outputs.squeeze()) > threshold).float()
-        
-        # Convert to numpy for metric calculation
-        y_train_np = y_train.cpu().numpy()
-        train_preds_np = train_preds.cpu().numpy()
-        y_test_np = y_test.cpu().numpy()
-        test_preds_np = test_preds.cpu().numpy()
-        
-        # Calculate metrics
-        train_accuracy = accuracy_score(y_train_np, train_preds_np)
-        train_precision = precision_score(y_train_np, train_preds_np)
-        train_recall = recall_score(y_train_np, train_preds_np)
-        train_f1 = f1_score(y_train_np, train_preds_np)
-        
-        test_accuracy = accuracy_score(y_test_np, test_preds_np)
-        test_precision = precision_score(y_test_np, test_preds_np)
-        test_recall = recall_score(y_test_np, test_preds_np)
-        test_f1 = f1_score(y_test_np, test_preds_np)
+model.load_state_dict(best_model)
 
-        # Calculate confusion matrices
-        train_cm = confusion_matrix(y_train_np, train_preds_np)
-        test_cm = confusion_matrix(y_test_np, test_preds_np)
+# Plot training loss and gradient norms
+plt.figure(figsize=(12, 6))
+plt.subplot(2, 1, 1)
+plt.plot(range(1, len(train_losses) + 1), train_losses)
+plt.title('Training Loss Over Epochs')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.yscale('log')
+plt.grid(True)
 
-        # Create combined table
-        metrics_table = [
-            ["Metric", "Training", "Test"],
-            ["Accuracy", f"{train_accuracy:.4f}", f"{test_accuracy:.4f}"],
-            ["Precision", f"{train_precision:.4f}", f"{test_precision:.4f}"],
-            ["Recall", f"{train_recall:.4f}", f"{test_recall:.4f}"],
-            ["F1-score", f"{train_f1:.4f}", f"{test_f1:.4f}"]
-        ]
+plt.subplot(2, 1, 2)
+plt.plot(range(1, len(grad_norms) + 1), grad_norms)
+plt.title('Gradient Norms Over Epochs')
+plt.xlabel('Epoch')
+plt.ylabel('Gradient Norm')
+plt.yscale('log')
+plt.grid(True)
 
-        print("\nModel Performance Metrics:")
-        print(tabulate(metrics_table, headers="firstrow", tablefmt="grid"))
+plt.tight_layout()
+plt.show()
 
-        # Create confusion matrix tables
-        cm_table = [
-            ["", "Training", "", "Test", ""],
-            ["", "Predicted Negative", "Predicted Positive", "Predicted Negative", "Predicted Positive"],
-            ["Actual Negative", train_cm[0][0], train_cm[0][1], test_cm[0][0], test_cm[0][1]],
-            ["Actual Positive", train_cm[1][0], train_cm[1][1], test_cm[1][0], test_cm[1][1]]
-        ]
 
-        print("\nConfusion Matrices:")
-        print(tabulate(cm_table, headers="firstrow", tablefmt="grid"))
-
-    model.train()
-    return train_precision, test_precision
-
-# After training, call the function like this:
-train_precision, test_precision = print_combined_performance_table(model, X_train, y_train, X_test, y_test, threshold)
-
-#%%
 
 # Evaluation
 model.eval()
@@ -546,16 +435,36 @@ with torch.no_grad():
     # Test data evaluation
     test_outputs = model(X_test)
     test_loss = criterion(test_outputs.squeeze(), y_test)
+    print(f'Test Loss: {test_loss.item():.4f}')
 
     # Convert probabilities to binary predictions for test data
     test_predictions = (torch.sigmoid(test_outputs.squeeze()) > 0.5).float()
+    
+    # Compute confusion matrix for test data
+    test_conf_matrix = confusion_matrix(y_test.cpu().numpy(), test_predictions.cpu().numpy())
+    print("Test Confusion Matrix:")
+    print(test_conf_matrix)
 
     # Training data evaluation
     train_outputs = model(X_train)
     train_loss = criterion(train_outputs.squeeze(), y_train)
+    print(f'Train Loss: {train_loss.item():.4f}')
 
     # Convert probabilities to binary predictions for training data
     train_predictions = (torch.sigmoid(train_outputs.squeeze()) > 0.5).float()
+    
+    # Compute confusion matrix for training data
+    train_conf_matrix = confusion_matrix(y_train.cpu().numpy(), train_predictions.cpu().numpy())
+    print("Train Confusion Matrix:")
+    print(train_conf_matrix)
+
+    # Check class distribution
+    print("Class distribution:")
+    print(y_train.sum().item() / len(y_train))
+
+    # If imbalanced, consider using class weights
+    pos_weight = torch.tensor([(len(y_train) - y_train.sum()) / y_train.sum()]).to(device)
+    criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
     # Calculate metrics for test data
     test_precision = precision_score(y_test.cpu().numpy(), test_predictions.cpu().numpy())
@@ -584,9 +493,75 @@ with torch.no_grad():
     print("\nModel Performance Metrics:")
     print(tabulate(metrics_table, headers="firstrow", tablefmt="grid"))
 
+    # Visualize the confusion matrices
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12,4))
+    
+    sns.heatmap(test_conf_matrix, annot=True, fmt='d', cmap='Blues', ax=ax1)
+    ax1.set_xlabel('Predicted')
+    ax1.set_ylabel('Actual')
+    ax1.set_title('Test Confusion Matrix')
+    
+    sns.heatmap(train_conf_matrix, annot=True, fmt='d', cmap='Blues', ax=ax2)
+    ax2.set_xlabel('Predicted')
+    ax2.set_ylabel('Actual')
+    ax2.set_title('Train Confusion Matrix')
+    
+    plt.tight_layout()
+    plt.show()
+
 # Output the device on which the model is running
 device = next(model.parameters()).device
 print(f"The model is running on: {device}")
+
+#%%
+#%%
+
+#%%
+n_paths = 100
+n_steps = 100
+risk_per_trade = 0.02
+# Function to simulate a single trading path
+def simulate_path(hit_rate, risk_2_reward, risk_per_trade, n_steps):
+    path = np.random.rand(n_steps)
+    path = np.log1p(risk_per_trade*np.where(path > hit_rate, 1/risk_2_reward, -1))
+    return np.expm1(path.cumsum())
+
+# Simulate paths
+paths = [simulate_path(test_precision, risk_2_reward, risk_per_trade, n_steps) for _ in range(n_paths)]
+
+# Plot the simulated paths
+# plt.figure(figsize=(12, 6))
+# for path in paths:
+#     plt.plot(path, alpha=0.1, color='blue')
+pd.DataFrame(paths).T.plot(figsize=(12, 6), alpha=0.1, legend=False)
+
+# Plot the average path
+average_path = np.mean(paths, axis=0)
+plt.plot(average_path, color='red', linewidth=2, label='Average Path')
+
+plt.title(f'Simulated Trading Paths (Precision: {test_precision:.4f}, Reward/Risk: {1/risk_2_reward:.4f})')
+plt.xlabel('Steps')
+plt.ylabel('Cumulative Return')
+# plt.legend()
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.show()
+
+# Print summary statistics
+final_returns = [path[-1] for path in paths]
+print(f"Average final return: {np.mean(final_returns):.2f}")
+print(f"Median final return: {np.median(final_returns):.2f}")
+print(f"Standard deviation of final returns: {np.std(final_returns):.2f}")
+print(f"Percentage of profitable paths: {(np.sum([r > 0 for r in final_returns]) / n_paths * 100):.2f}%")
+
+
+#%%
+
+#%%
+#%%
+#%%
+#%%
+#%%
 
 #%%
 # Feature importance analysis for GRU model
