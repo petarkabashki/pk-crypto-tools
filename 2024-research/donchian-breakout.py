@@ -53,12 +53,12 @@ param_defs = {
     # 'ewo_exit': {'method': 'suggest_float', 'min': -1, 'max': 1},
     # 'ewo_thre_short': {'method': 'suggest_float', 'min': -1, 'max': -0.01},
     # 'ema_filter_period': {'method': 'suggest_int', 'min': 200, 'max': 600, 'step': 20},
-    'up_lookback': {'method': 'suggest_int', 'min': 10, 'max': 100, 'step': 5, 'adjust_start': True},
-    'dn_lookback': {'method': 'suggest_int', 'min': 10, 'max': 100, 'step': 5, 'adjust_start': True},
-    'up_lag': {'method': 'suggest_int', 'min': 5, 'max': 100, 'step': 3, 'adjust_start': True},
-    'dn_lag': {'method': 'suggest_int', 'min': 5, 'max': 100, 'step': 3, 'adjust_start': True},
+    'up_lookback': {'method': 'suggest_int', 'min': 3, 'max': 50, 'step': 5, 'adjust_start': True},
+    'dn_lookback': {'method': 'suggest_int', 'min': 3, 'max': 50, 'step': 5, 'adjust_start': True},
+    'up_lag': {'method': 'suggest_int', 'min': 3, 'max': 50, 'step': 3, 'adjust_start': True},
+    'dn_lag': {'method': 'suggest_int', 'min': 3, 'max': 50, 'step': 3, 'adjust_start': True},
     'band_offset': {'method': 'suggest_float', 'min': 0, 'max': 1.0, 'step':0.1},
-    'atr_period': {'method': 'suggest_int', 'min': 3, 'max': 50, 'step': 3, 'adjust_start': True},
+    # 'atr_period': {'method': 'suggest_int', 'min': 4, 'max': 30, 'step': 3, 'adjust_start': True},
     # 'band_offset_up': {'method': 'suggest_float', 'min': 0, 'max': 1.0},
     # 'band_offset_dn': {'method': 'suggest_float', 'min': 0, 'max': 1.0},
 }
@@ -70,8 +70,9 @@ def skip_first_fn(param_defs, params):
     )
   
 def calculate_indicators(ohlcv, params):    
-    atr = talib.ATR(ohlcv['high'], ohlcv['low'], ohlcv['close'], timeperiod=params['atr_period'])
-    data_norm = ohlcv[['open','high','low','close']].divide(atr, axis=0)
+    # atr = talib.ATR(ohlcv['high'], ohlcv['low'], ohlcv['close'], timeperiod=params['atr_period'])
+    # data_norm = ohlcv[['open','high','low','close']].divide(atr, axis=0)
+    data_norm = ohlcv[['open','high','low','close']]
     
     donch_up = data_norm['close'].rolling(window=params['up_lookback']).max().shift(params['up_lag'])
     donch_dn = data_norm['close'].rolling(window=params['dn_lookback']).min().shift(params['dn_lag'])
@@ -79,7 +80,8 @@ def calculate_indicators(ohlcv, params):
     
     log_price = data['close'].apply(np.log)
     return {
-        'ohlcv': ohlcv, 'atr': atr, 'donch_up': donch_up, 'donch_dn': donch_dn, 'donch_mid': donch_mid, 'log_price': log_price,
+        'ohlcv': ohlcv, #'atr': atr, 
+        'donch_up': donch_up, 'donch_dn': donch_dn, 'donch_mid': donch_mid, 'log_price': log_price,
         'data_norm': data_norm
     }
     
@@ -87,7 +89,7 @@ def generate_long_enter_signal(indicators):
     bull = (indicators['data_norm']['close'] > indicators['donch_up'])
     return (
                 bull & (~bull.shift(fill_value=False))
-                & (indicators['donch_up'] > indicators['donch_dn'])
+                # & (indicators['donch_up'] > indicators['donch_dn'])
                 # & (data['close'] > data['ema_filter'])
                 # & (data['ewo'] > params['ewo_enter'])
             ).astype(int)#.shift(fill_value=0)
@@ -99,7 +101,7 @@ def generate_long_exit_signal(indicators):
 def generate_short_enter_signal(indicators):
     return (
                 (indicators['data_norm']['close'] < indicators['donch_dn'])  #& (~data['donch_up'].isna()) & (~data['donch_dn'].isna())
-                & (indicators['donch_up'] < indicators['donch_dn'])
+                # & (indicators['donch_up'] < indicators['donch_dn'])
             ).astype(int)
 def generate_short_exit_signal(indicators):
     return (
@@ -301,7 +303,7 @@ optuna.logging.set_verbosity(optuna.logging.ERROR)
 # asset = 'NVDA'
 # data = load_index_candles(asset)
 ### Cryptos - SPOT
-asset, quote, timeframe, exchange = 'BTC', 'USDT', '4h', 'binance'
+asset, quote, timeframe, exchange = 'BTC', 'USDT', '8h', 'binance'
 data = load_candles('binance',asset, quote, timeframe)['2020':'2025']#.iloc[-35000:-5000]
 # data = data.sample(n=5000,replace=True).reset_index(drop=True)
 # .assign(log_price=lambda df:df['close'].apply(np.log)
@@ -310,7 +312,7 @@ nhours = 9; train_ratio = 1;  long_short = 'long'
 btargs = {'transaction_cost':0.001, 'slippage':0.003, 'precision':3, 'period_costs':0}
 # data = data.resample(f'{nhours}H').agg({'open': 'first','high': 'max','low': 'min','close': 'last','volume': 'sum'})
 # data_train = data.iloc[:int(data.shape[0]*train_ratio)]; data_test = data.iloc[data.shape[0]:]
-study = optimize_strategy(data, param_defs, calculate_indicators, signals_generator, skip_first_fn, btargs, long_short=long_short, n_trials=500, optimize_metrics=['tot_return', 'max_drawdown'])
+study = optimize_strategy(data, param_defs, calculate_indicators, signals_generator, skip_first_fn, btargs, long_short=long_short, n_trials=500, optimize_metrics=['sortino', ])
 aparams = [t.params for t in reversed(study.best_trials[-10:])]
 # def custom_metric(metrics):
 #     return metrics['overall_metrics']['tot_return'] / abs(metrics['overall_metrics']['max_drawdown'])
@@ -326,13 +328,13 @@ aparams = [t.params for t in reversed(study.best_trials[-10:])]
 # print(f'aparams = {aparams}')
 #%%
 
-params = aparams[0]
-print('params:')
-pprint(params)
-indicators = calculate_indicators(data, params)
-entry_indices, exit_indices, metrics = comp_backtest(indicators,param_defs,params, signals_generator, long_short='long', skip_first_fn=skip_first_fn, flip_signal=False, btargs=btargs)
-fig = plot_strategy(indicators,metrics,entry_indices,exit_indices,title=f'Asset: {asset}',convert_to_pct=True, mult_100=True)
-plt.show()
+# params = aparams[0]
+# print('params:')
+# pprint(params)
+# indicators = calculate_indicators(data, params)
+# entry_indices, exit_indices, metrics = comp_backtest(indicators,param_defs,params, signals_generator, long_short='long', skip_first_fn=skip_first_fn, flip_signal=False, btargs=btargs)
+# fig = plot_strategy(indicators,metrics,entry_indices,exit_indices,title=f'Asset: {asset}',convert_to_pct=True, mult_100=True)
+# plt.show()
 
 #%%
 for ipa, params in enumerate(aparams[:]):
@@ -345,17 +347,15 @@ for ipa, params in enumerate(aparams[:]):
         print('--- LONG -----------------------------------------------------')
         entry_indices, exit_indices, metrics = comp_backtest(indicators,param_defs,params, signals_generator, long_short='long', skip_first_fn=skip_first_fn, flip_signal=False, btargs=btargs)
         fig = plot_strategy(indicators,metrics,entry_indices,exit_indices,title=f'Asset: {asset}',convert_to_pct=True, mult_100=True)
-        plt.show()
         # if fig: fig.get_axes()[0].set_title(f'Asset: {asset}')
         # print('--- SHORT -----------------------------------------------------')
         # entry_indices, exit_indices, metrics = comp_backtest(indicators,param_defs,params, signals_generator, long_short='short', skip_first_fn=skip_first_fn, flip_signal=False, btargs=btargs)
         # fig = plot_strategy(indicators,metrics,entry_indices,exit_indices,title=f'Asset: {asset}',convert_to_pct=True, mult_100=True)
-        # plt.show()
         # if fig: fig.get_axes()[0].set_title(f'Asset: {asset}')
         
 #%%
 
-asset, quote, timeframe, exchange = 'ETH', 'USDT', '4h', 'binance'
+asset, quote, timeframe, exchange = 'AVAX', 'USDT', '8h', 'binance'
 data = load_candles('binance',asset, quote, timeframe)['2020':'2025']
 nhours = 9; train_ratio = 1;  long_short = 'long'
 btargs = {'transaction_cost':0.001, 'slippage':0.003, 'precision':3, 'period_costs':0}

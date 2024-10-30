@@ -17,3 +17,5 @@ key.enc
 **/plot
 *.lock
 *.csv
+.aider*
+.env
