@@ -53,11 +53,11 @@ param_defs = {
     # 'ewo_exit': {'method': 'suggest_float', 'min': -1, 'max': 1},
     # 'ewo_thre_short': {'method': 'suggest_float', 'min': -1, 'max': -0.01},
     # 'ema_filter_period': {'method': 'suggest_int', 'min': 200, 'max': 600, 'step': 20},
-    'up_lookback': {'method': 'suggest_int', 'min': 3, 'max': 50, 'step': 5, 'adjust_start': True},
-    'dn_lookback': {'method': 'suggest_int', 'min': 3, 'max': 50, 'step': 5, 'adjust_start': True},
-    'up_lag': {'method': 'suggest_int', 'min': 3, 'max': 50, 'step': 3, 'adjust_start': True},
-    'dn_lag': {'method': 'suggest_int', 'min': 3, 'max': 50, 'step': 3, 'adjust_start': True},
-    'band_offset': {'method': 'suggest_float', 'min': 0, 'max': 1.0, 'step':0.1},
+    'up_lookback': {'method': 'suggest_int', 'min': 3, 'max': 250, 'step': 5, 'adjust_start': True},
+    'dn_lookback': {'method': 'suggest_int', 'min': 3, 'max': 250, 'step': 5, 'adjust_start': True},
+    'up_lag': {'method': 'suggest_int', 'min': 3, 'max': 250, 'step': 3, 'adjust_start': True},
+    'dn_lag': {'method': 'suggest_int', 'min': 3, 'max': 250, 'step': 3, 'adjust_start': True},
+    'band_offset': {'method': 'suggest_float', 'min': 0.4, 'max': 0.6, 'step':0.1},
     # 'atr_period': {'method': 'suggest_int', 'min': 4, 'max': 30, 'step': 3, 'adjust_start': True},
     # 'band_offset_up': {'method': 'suggest_float', 'min': 0, 'max': 1.0},
     # 'band_offset_dn': {'method': 'suggest_float', 'min': 0, 'max': 1.0},
@@ -303,7 +303,7 @@ optuna.logging.set_verbosity(optuna.logging.ERROR)
 # asset = 'NVDA'
 # data = load_index_candles(asset)
 ### Cryptos - SPOT
-asset, quote, timeframe, exchange = 'BTC', 'USDT', '8h', 'binance'
+asset, quote, timeframe, exchange = 'BTC', 'USDT', '4h', 'binance'
 data = load_candles('binance',asset, quote, timeframe)['2020':'2025']#.iloc[-35000:-5000]
 # data = data.sample(n=5000,replace=True).reset_index(drop=True)
 # .assign(log_price=lambda df:df['close'].apply(np.log)
@@ -312,7 +312,7 @@ nhours = 9; train_ratio = 1;  long_short = 'long'
 btargs = {'transaction_cost':0.001, 'slippage':0.003, 'precision':3, 'period_costs':0}
 # data = data.resample(f'{nhours}H').agg({'open': 'first','high': 'max','low': 'min','close': 'last','volume': 'sum'})
 # data_train = data.iloc[:int(data.shape[0]*train_ratio)]; data_test = data.iloc[data.shape[0]:]
-study = optimize_strategy(data, param_defs, calculate_indicators, signals_generator, skip_first_fn, btargs, long_short=long_short, n_trials=500, optimize_metrics=['sortino', ])
+study = optimize_strategy(data, param_defs, calculate_indicators, signals_generator, skip_first_fn, btargs, long_short=long_short, n_trials=200, optimize_metrics=['tot_return', ])
 aparams = [t.params for t in reversed(study.best_trials[-10:])]
 # def custom_metric(metrics):
 #     return metrics['overall_metrics']['tot_return'] / abs(metrics['overall_metrics']['max_drawdown'])
@@ -344,18 +344,19 @@ for ipa, params in enumerate(aparams[:]):
     if len(data):
         indicators = calculate_indicators(data, params)
         
-        print('--- LONG -----------------------------------------------------')
-        entry_indices, exit_indices, metrics = comp_backtest(indicators,param_defs,params, signals_generator, long_short='long', skip_first_fn=skip_first_fn, flip_signal=False, btargs=btargs)
+        print(f'--- {long_short.upper()} -----------------------------------------------------')
+        entry_indices, exit_indices, metrics = comp_backtest(indicators,param_defs,params, signals_generator, long_short=long_short, skip_first_fn=skip_first_fn, flip_signal=False, btargs=btargs)
         fig = plot_strategy(indicators,metrics,entry_indices,exit_indices,title=f'Asset: {asset}',convert_to_pct=True, mult_100=True)
         # if fig: fig.get_axes()[0].set_title(f'Asset: {asset}')
         # print('--- SHORT -----------------------------------------------------')
         # entry_indices, exit_indices, metrics = comp_backtest(indicators,param_defs,params, signals_generator, long_short='short', skip_first_fn=skip_first_fn, flip_signal=False, btargs=btargs)
         # fig = plot_strategy(indicators,metrics,entry_indices,exit_indices,title=f'Asset: {asset}',convert_to_pct=True, mult_100=True)
+
         # if fig: fig.get_axes()[0].set_title(f'Asset: {asset}')
         
 #%%
 
-asset, quote, timeframe, exchange = 'AVAX', 'USDT', '8h', 'binance'
+asset, quote, timeframe, exchange = 'ALGO', 'USDT', '8h', 'binance'
 data = load_candles('binance',asset, quote, timeframe)['2020':'2025']
 nhours = 9; train_ratio = 1;  long_short = 'long'
 btargs = {'transaction_cost':0.001, 'slippage':0.003, 'precision':3, 'period_costs':0}

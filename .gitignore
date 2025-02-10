@@ -19,3 +19,5 @@ key.enc
 *.csv
 .aider*
 .env
+node_modules
+build
