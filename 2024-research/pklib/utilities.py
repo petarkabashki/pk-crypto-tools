@@ -3,7 +3,7 @@ import numpy as np
 # from pkindicators import *
 
 # /media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data
-base_data_folder = '/media/mu6mula/Data/Crypto-Data-Feed/freq-user-data/data'
+base_data_folder = '/media/mu6mula/Data1/Crypto-Data-Feed/freq-user-data/data'
 
 def load_json_candles(fname):
     data = pd.read_json(fname)

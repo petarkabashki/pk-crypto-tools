@@ -7,10 +7,12 @@ requires-python = ">=3.11"
 dependencies = [
     "beautifulsoup4>=4.13.3",
     "binance-connector",
+    "binance-futures-connector>=4.1.0",
     "ipykernel>=6.29.5",
     "markdownify>=0.14.1",
     "matplotlib>=3.10.0",
     "pandas>=2.2.3",
+    "python-binance>=1.0.27",
     "python-dotenv>=1.0.1",
     "requests>=2.32.3",
 ]

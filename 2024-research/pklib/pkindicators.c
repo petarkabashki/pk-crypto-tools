@@ -1,94 +1,155 @@
 #include <Python.h>
 #include <numpy/arrayobject.h>
 
-// Function to calculate ZigZag indicator and return high/low markers and turning points
+// Function to calculate ZigZag indicator and return high/low markers and turning points.
+// Now accepts separate arrays for highs and lows.
 static PyObject* calculate_zigzag(PyObject* self, PyObject* args, PyObject* kwargs) {
-    PyArrayObject *price_array;
+    PyArrayObject *highs_array = NULL, *lows_array = NULL;
     double epsilon = 0.5;  // Default epsilon
 
-    static char *kwlist[] = {"prices", "epsilon", NULL};
+    static char *kwlist[] = {"highs", "lows", "epsilon", NULL};
 
     // Parse Python arguments with keywords
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!|d", kwlist, &PyArray_Type, &price_array, &epsilon)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!|d", kwlist,
+                                     &PyArray_Type, &highs_array,
+                                     &PyArray_Type, &lows_array,
+                                     &epsilon)) {
         return NULL;
     }
 
-    // Ensure the input is a 1D numpy array
-    if (PyArray_NDIM(price_array) != 1) {
-        PyErr_SetString(PyExc_ValueError, "Price array must be a 1D numpy array.");
+    // Ensure both arrays are 1D and of equal length
+    if (PyArray_NDIM(highs_array) != 1 || PyArray_NDIM(lows_array) != 1) {
+        PyErr_SetString(PyExc_ValueError, "Highs and lows arrays must be 1D.");
         return NULL;
     }
-
-    // Get the length of the array
-    npy_intp length = PyArray_DIM(price_array, 0);
+    npy_intp length_highs = PyArray_DIM(highs_array, 0);
+    npy_intp length_lows = PyArray_DIM(lows_array, 0);
+    if (length_highs != length_lows) {
+        PyErr_SetString(PyExc_ValueError, "Highs and lows arrays must be of the same length.");
+        return NULL;
+    }
+    npy_intp length = length_highs;
 
     // Create output arrays for high/low markers and turning points
     PyObject *high_low_markers = PyArray_SimpleNew(1, &length, NPY_INT);
     PyObject *turning_points = PyArray_SimpleNew(1, &length, NPY_INT);
-
     int *markers_data = (int*)PyArray_DATA((PyArrayObject*)high_low_markers);
     int *turning_points_data = (int*)PyArray_DATA((PyArrayObject*)turning_points);
-    double *price_data = (double*)PyArray_DATA(price_array);
+    double *highs = (double*)PyArray_DATA(highs_array);
+    double *lows = (double*)PyArray_DATA(lows_array);
 
-    int direction = 0;
-    int last_extreme_index = 0;
-    double last_extreme_value = price_data[0];
-
-    // Initialize output arrays
+    // Initialize the output arrays to 0.
     for (npy_intp i = 0; i < length; i++) {
         markers_data[i] = 0;
         turning_points_data[i] = 0;
     }
 
-    // Process each price point
-    for (npy_intp i = 1; i < length; i++) {
-        double current_price = price_data[i];
-        double price_diff = current_price - last_extreme_value;
+    int direction = 0;      //  1: uptrend, -1: downtrend, 0: not yet established
+    int last_extreme_index = 0;
+    double last_extreme_value = 0.0;
 
-        if (direction == 0) {
-            if (fabs(price_diff) >= epsilon) {
-                direction = (price_diff > 0) ? 1 : -1;
-                last_extreme_index = i;
-                last_extreme_value = current_price;
-                markers_data[i] = (direction == 1) ? 1 : -1;
-                turning_points_data[i] = direction;
-            }
-        } else if (direction == 1) {
-            if (current_price >= last_extreme_value) {
-                last_extreme_index = i;
-                last_extreme_value = current_price;
-            } else if (last_extreme_value - current_price >= epsilon) {
-                direction = -1;
-                markers_data[last_extreme_index] = 1;
-                turning_points_data[last_extreme_index] = 1;
+    // --- Pre-scan Phase: Determine the initial turning point after a significant move ---
+    // We track candidate extremes from the start.
+    int candidate_low_index = 0, candidate_high_index = 0;
+    double candidate_low = lows[0];
+    double candidate_high = highs[0];
+    int trend_detected = 0;
+    int i = 1;
+    for (; i < length; i++) {
+        // Update candidate for uptrend (lowest low)
+        if (lows[i] < candidate_low) {
+            candidate_low = lows[i];
+            candidate_low_index = i;
+        }
+        // Update candidate for downtrend (highest high)
+        if (highs[i] > candidate_high) {
+            candidate_high = highs[i];
+            candidate_high_index = i;
+        }
+        // Check if an upward move is detected:
+        //    current high minus the lowest candidate low is at least epsilon.
+        if (highs[i] - candidate_low >= epsilon) {
+            trend_detected = 1;
+            direction = 1; // uptrend
+            // The initial turning point will be the lowest low candidate.
+            last_extreme_index = candidate_low_index;
+            last_extreme_value = candidate_low;
+            // For an uptrend, mark the turning point as a trough (use -1).
+            markers_data[last_extreme_index] = -1;
+            turning_points_data[last_extreme_index] = -1;
+            break;
+        }
+        // Check if a downward move is detected:
+        //    highest candidate high minus current low is at least epsilon.
+        if (candidate_high - lows[i] >= epsilon) {
+            trend_detected = -1;
+            direction = -1; // downtrend
+            // The initial turning point will be the highest high candidate.
+            last_extreme_index = candidate_high_index;
+            last_extreme_value = candidate_high;
+            // For a downtrend, mark the turning point as a peak (use 1).
+            markers_data[last_extreme_index] = 1;
+            turning_points_data[last_extreme_index] = 1;
+            break;
+        }
+    }
 
+    // If no significant move was detected in the pre-scan, return arrays of zeros.
+    if (trend_detected == 0) {
+        return Py_BuildValue("OO", high_low_markers, turning_points);
+    }
+
+    // --- Main Loop: Process remaining data starting from the next index ---
+    for (i = i + 1; i < length; i++) {
+        if (direction == 1) {  // Currently in an uptrend
+            // In an uptrend, update the turning point if a new lower low is found.
+            if (lows[i] < last_extreme_value) {
                 last_extreme_index = i;
-                last_extreme_value = current_price;
-                // markers_data[i] = -1;
-                turning_points_data[i] = -1;
+                last_extreme_value = lows[i];
             }
-        } else if (direction == -1) {
-            if (current_price <= last_extreme_value) {
-                last_extreme_index = i;
-                last_extreme_value = current_price;
-            } else if (current_price - last_extreme_value >= epsilon) {
-                direction = 1;
+            // Check for reversal: if a high rises at least epsilon above the current low.
+            if (highs[i] - last_extreme_value >= epsilon) {
+                // Finalize the current turning point.
                 markers_data[last_extreme_index] = -1;
                 turning_points_data[last_extreme_index] = -1;
-
+                // Switch to a downtrend.
+                direction = -1;
+                // Set the new extreme as the current high.
                 last_extreme_index = i;
-                last_extreme_value = current_price;
-                // markers_data[i] = 1;
+                last_extreme_value = highs[i];
                 turning_points_data[i] = 1;
+            }
+        } else if (direction == -1) {  // Currently in a downtrend
+            // In a downtrend, update the turning point if a new higher high is found.
+            if (highs[i] > last_extreme_value) {
+                last_extreme_index = i;
+                last_extreme_value = highs[i];
+            }
+            // Check for reversal: if a low drops at least epsilon below the current high.
+            if (last_extreme_value - lows[i] >= epsilon) {
+                markers_data[last_extreme_index] = 1;
+                turning_points_data[last_extreme_index] = 1;
+                direction = 1;
+                last_extreme_index = i;
+                last_extreme_value = lows[i];
+                turning_points_data[i] = -1;
             }
         }
     }
 
-    markers_data[last_extreme_index] = (direction == 1) ? 1 : -1;
-    turning_points_data[last_extreme_index] = direction;
+    // Mark the final extreme point.
+    if (direction == 1) {
+        markers_data[last_extreme_index] = -1;
+        turning_points_data[last_extreme_index] = -1;
+    } else {
+        markers_data[last_extreme_index] = 1;
+        turning_points_data[last_extreme_index] = 1;
+    }
 
     return Py_BuildValue("OO", high_low_markers, turning_points);
 }
+
+
 
 static PyObject* find_cross(PyObject* self, PyObject* args) {
     PyArrayObject *fast_array, *slow_array;

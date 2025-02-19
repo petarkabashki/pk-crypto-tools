@@ -57,3 +57,19 @@ print(result)
 ```
 
 This will download the specified data and return the status.
+
+## MCP COnfiguration for Cline/RooCode:
+
+```
+    "freqtrade_download_data": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/media/mu6mula/Data1/Quant/pk-crypto-tools/2025/mcp-servers/mcp-server-freqtrade",
+        "run",
+        "freqtrade-downloader.py"
+      ],
+      "disabled": false,
+      "alwaysAllow": []
+    },
+```

@@ -7,7 +7,7 @@ import os
 mcp = FastMCP("Freqtrade Data Downloader")
 
 @mcp.tool()
-def freqtrade_download_data(userdir: str = None, exchange: str = "binance", timeframes: str = None, pairs: str = None) -> str:
+def freqtrade_download_data(userdir: str = None, exchange: str = "binance", timeframes: list[str] = ['1d'], pairs: list[str] = ['btcusdt']) -> str:
     """
     Downloads historical data for trading pairs using Freqtrade.
 
@@ -15,7 +15,7 @@ def freqtrade_download_data(userdir: str = None, exchange: str = "binance", time
         userdir: Path to the Freqtrade user data directory (e.g., ./freq-user-data). If not provided, it will be loaded from the .env file.
         exchange: The exchange to download data from (e.g., binance). Defaults to "kucoin".
         timeframes: List of timeframes to download (e.g., ["3d", "1d", "1h"]). If not provided, it will be loaded from the .env file.
-        pairs: List of trading pairs to download data for (e.g., ["BTC/USDT", "ETH/USDT"]). If not provided, it will be loaded from the .env file.
+        pairs: List of uppercase trading pairs to download data for (e.g., ["BTC/USDT", "ETH/USDT"]). If not provided, it will be loaded from the .env file. If concatenated pair are provided by the user like 'btcusdt', it will be converted to 'BTC/USDT' by extracting the quote asset at the end of the string which is one of [BTC, USDT, ETH].
 
     Returns:
         The output of the freqtrade download-data command as a string.
@@ -24,12 +24,12 @@ def freqtrade_download_data(userdir: str = None, exchange: str = "binance", time
 
     if userdir is None:
         userdir = os.getenv('USERDIR', './freq-user-data')
-    if timeframes is None:
-        timeframes = os.getenv('TIMEFRAMES', '1d')
-    timeframes = timeframes.split()
-    if pairs is None:
-        pairs = os.getenv('PAIRS', 'BTC/USDT ETH/USDT')
-    pairs = pairs.split()
+    # if timeframes is None:
+    #     timeframes = os.getenv('TIMEFRAMES', '1d')
+    # timeframes = timeframes.split()
+    # if pairs is None:
+    #     pairs = os.getenv('PAIRS', 'BTC/USDT ETH/USDT')
+    # pairs = pairs.split()
 
     timeframes_arg = " ".join(timeframes)
     pairs_arg = " ".join(pairs)
