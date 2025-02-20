@@ -70,7 +70,7 @@ static PyObject* calculate_zigzag(PyObject* self, PyObject* args, PyObject* kwar
         }
         // Check if an upward move is detected:
         //    current high minus the lowest candidate low is at least epsilon.
-        if (highs[i] - candidate_low >= epsilon) {
+        if (highs[i] / candidate_low -1 >= epsilon) {
             trend_detected = 1;
             direction = 1; // uptrend
             // current_extreme_index = i;
@@ -88,7 +88,7 @@ static PyObject* calculate_zigzag(PyObject* self, PyObject* args, PyObject* kwar
         }
         // Check if a downward move is detected:
         //    highest candidate high minus current low is at least epsilon.
-        if (candidate_high - lows[i] >= epsilon) {
+        if (candidate_high / lows[i] -1 >= epsilon) {
             trend_detected = -1;
             direction = -1; // downtrend
             // current_extreme_index = i;
@@ -115,7 +115,7 @@ static PyObject* calculate_zigzag(PyObject* self, PyObject* args, PyObject* kwar
     for (i = i + 1; i < length; i++) {
         if (direction == 1) {  // Currently in an uptrend a high rises at least epsilon above the current low.
             // Check for reversal: if
-            if (last_extreme_value - lows[i] >= epsilon) {
+            if (last_extreme_value / lows[i] -1 >= epsilon) {
                 markers_data[last_extreme_index] = 1;
                 turning_points_data[i] = -1;
                 direction = -1;
@@ -129,7 +129,7 @@ static PyObject* calculate_zigzag(PyObject* self, PyObject* args, PyObject* kwar
             }
         } else if (direction == -1) {  // Currently in a downtrend
             // Check for reversal: if a low drops at least epsilon below the current high.
-            if (highs[i] - last_extreme_value >= epsilon) {
+            if (highs[i] / last_extreme_value -1 >= epsilon) {
                 // Finalize the current turning point.
                 markers_data[last_extreme_index] = -1;
                 turning_points_data[i] = 1;
