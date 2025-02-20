@@ -47,6 +47,8 @@ static PyObject* calculate_zigzag(PyObject* self, PyObject* args, PyObject* kwar
     int direction = 0;      //  1: uptrend, -1: downtrend, 0: not yet established
     int last_extreme_index = 0;
     double last_extreme_value = 0.0;
+    // int current_extreme_index = 0;
+    // double current_extreme_value = 0.0;
 
     // --- Pre-scan Phase: Determine the initial turning point after a significant move ---
     // We track candidate extremes from the start.
@@ -71,12 +73,17 @@ static PyObject* calculate_zigzag(PyObject* self, PyObject* args, PyObject* kwar
         if (highs[i] - candidate_low >= epsilon) {
             trend_detected = 1;
             direction = 1; // uptrend
+            // current_extreme_index = i;
+            // current_extreme_value = highs[i];
             // The initial turning point will be the lowest low candidate.
             last_extreme_index = candidate_low_index;
             last_extreme_value = candidate_low;
             // For an uptrend, mark the turning point as a trough (use -1).
             markers_data[last_extreme_index] = -1;
-            turning_points_data[last_extreme_index] = -1;
+            turning_points_data[i] = 1;
+
+            last_extreme_index = candidate_high_index;
+            last_extreme_value = candidate_high;
             break;
         }
         // Check if a downward move is detected:
@@ -84,12 +91,17 @@ static PyObject* calculate_zigzag(PyObject* self, PyObject* args, PyObject* kwar
         if (candidate_high - lows[i] >= epsilon) {
             trend_detected = -1;
             direction = -1; // downtrend
+            // current_extreme_index = i;
+            // current_extreme_value = lows[i];
             // The initial turning point will be the highest high candidate.
             last_extreme_index = candidate_high_index;
             last_extreme_value = candidate_high;
             // For a downtrend, mark the turning point as a peak (use 1).
             markers_data[last_extreme_index] = 1;
-            turning_points_data[last_extreme_index] = 1;
+            turning_points_data[last_extreme_index] = -1;
+
+            last_extreme_index = candidate_low_index;
+            last_extreme_value = candidate_low;
             break;
         }
     }
@@ -101,38 +113,35 @@ static PyObject* calculate_zigzag(PyObject* self, PyObject* args, PyObject* kwar
 
     // --- Main Loop: Process remaining data starting from the next index ---
     for (i = i + 1; i < length; i++) {
-        if (direction == 1) {  // Currently in an uptrend
-            // In an uptrend, update the turning point if a new lower low is found.
-            if (lows[i] < last_extreme_value) {
-                last_extreme_index = i;
-                last_extreme_value = lows[i];
-            }
-            // Check for reversal: if a high rises at least epsilon above the current low.
-            if (highs[i] - last_extreme_value >= epsilon) {
-                // Finalize the current turning point.
-                markers_data[last_extreme_index] = -1;
-                turning_points_data[last_extreme_index] = -1;
-                // Switch to a downtrend.
+        if (direction == 1) {  // Currently in an uptrend a high rises at least epsilon above the current low.
+            // Check for reversal: if
+            if (last_extreme_value - lows[i] >= epsilon) {
+                markers_data[last_extreme_index] = 1;
+                turning_points_data[i] = -1;
                 direction = -1;
-                // Set the new extreme as the current high.
                 last_extreme_index = i;
-                last_extreme_value = highs[i];
-                turning_points_data[i] = 1;
+                last_extreme_value = highs[last_extreme_index];
             }
-        } else if (direction == -1) {  // Currently in a downtrend
             // In a downtrend, update the turning point if a new higher high is found.
             if (highs[i] > last_extreme_value) {
                 last_extreme_index = i;
                 last_extreme_value = highs[i];
             }
+        } else if (direction == -1) {  // Currently in a downtrend
             // Check for reversal: if a low drops at least epsilon below the current high.
-            if (last_extreme_value - lows[i] >= epsilon) {
-                markers_data[last_extreme_index] = 1;
-                turning_points_data[last_extreme_index] = 1;
+            if (highs[i] - last_extreme_value >= epsilon) {
+                // Finalize the current turning point.
+                markers_data[last_extreme_index] = -1;
+                turning_points_data[i] = 1;
+                // Switch to a downtrend.
                 direction = 1;
                 last_extreme_index = i;
+                last_extreme_value = lows[last_extreme_index];
+            }
+            // In an uptrend, update the turning point if a new lower low is found.
+            if (lows[i] < last_extreme_value) {
+                last_extreme_index = i;
                 last_extreme_value = lows[i];
-                turning_points_data[i] = -1;
             }
         }
     }
