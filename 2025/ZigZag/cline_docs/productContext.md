@@ -1,0 +1,1 @@
+A price-action trading strategy based on directional change/zigzag algorithm, backtesting and visualization
