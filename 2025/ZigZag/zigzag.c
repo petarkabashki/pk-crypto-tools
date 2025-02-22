@@ -147,13 +147,13 @@ static PyObject* calculate_zigzag(PyObject* self, PyObject* args, PyObject* kwar
     }
 
     // Mark the final extreme point.
-    if (direction == 1) {
-        markers_data[last_extreme_index] = -1;
-        turning_points_data[last_extreme_index] = -1;
-    } else {
-        markers_data[last_extreme_index] = 1;
-        turning_points_data[last_extreme_index] = 1;
-    }
+    // if (direction == 1) {
+    //     markers_data[last_extreme_index] = -1;
+    //     turning_points_data[last_extreme_index] = -1;
+    // } else {
+    //     markers_data[last_extreme_index] = 1;
+    //     turning_points_data[last_extreme_index] = 1;
+    // }
 
     return Py_BuildValue("OO", high_low_markers, turning_points);
 }

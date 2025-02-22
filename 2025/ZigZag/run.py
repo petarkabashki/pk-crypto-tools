@@ -27,13 +27,13 @@ dir(zigzag)
 
 # fib_levels = np.array([-1.0, -0.786, -0.618, -0.5, -0.414, -0.382, -0.236, 0.0, 0.236, 0.382, 0.414, 0.5, 0.618, 0.786, 1.0, 1.236, 1.5, 1.618, 1.786, 2.0, 2.236, 2.382, 2.5, 2.628, 2.786, 3, 3.382, 3.618, 4, 5])
 # fib_levels = np.array([-1.0, -0.786, -0.618, -0.5, -0.414, -0.382, -0.236, 0.0, 0.236, 0.382, 0.414, 0.5, 0.618, 0.786, 1.0, 1.236, 1.414, 1.5, 1.618, 1.786, 2.0])
-fib_levels = np.array([0.0, 0.236, 0.414, 0.382, 0.5, 0.618, 0.786, 1.0])
+fib_levels = np.array([-1.0, -0.786, -0.618, -0.5, -0.236, 0.0, 0.236, 0.5, 0.618, 0.786, 1.0, 1.236, 1.5, 1.618, 1.786, 2.0])
 
 fib_columns = [f'fib({fib})' for fib in fib_levels]
 
-exchange,base,quote,timeframe = 'binance','ETH', 'USDT', '1h'
+exchange,base,quote,timeframe = 'binance','ETH', 'USDT', '2h'
 data = load_candles(exchange,base,quote,timeframe)#.apply(np.log)
-epsilon = 0.05
+epsilon = 0.10
 highs = data['high'].values
 lows = data['low'].values
 # highs = lows = data.close.values
@@ -41,27 +41,45 @@ lows = data['low'].values
 high_low_markers, turning_markers = zigzag.calculate_zigzag(highs, lows, epsilon=epsilon)
 
 extreme_points_ix = np.where(high_low_markers != 0)[0]
+extreme_points_hi_ix = np.where(high_low_markers == 1)[0]
+extreme_points_lo_ix = np.where(high_low_markers == -1)[0]
 extreme_points = high_low_markers[extreme_points_ix]
 extreme_prices = np.where(extreme_points == 1, highs[extreme_points_ix], lows[extreme_points_ix])
 
 turning_points_ix = np.where(turning_markers !=0)[0]
-
+turning_points_up_ix = np.where(turning_markers == 1)[0]
+turning_points_dn_ix = np.where(turning_markers == -1)[0]
+# turning_extremes_ix = np.full(len(high_low_markers), np.nan)
 
 # running_highs_idx = pd.Series(np.where(high_low_markers == 1, 1, np.nan) * np.arange(len(data)), index=data.index).ffill().values
 # running_lows_idx = pd.Series(np.where(high_low_markers == -1, 1, np.nan) * np.arange(len(data)), index=data.index).ffill().values
 
 ##############################################
 
-fhigh_low_markers, fturning_markers = zigzag.calculate_zigzag(highs, lows, epsilon=epsilon * 1)
+# fhigh_low_markers, fturning_markers = zigzag.calculate_zigzag(highs, lows, epsilon=epsilon * 1)
 
-running_highs = pd.Series(np.where(fhigh_low_markers == 1, 1, np.nan) * highs).ffill().values
-running_lows = pd.Series(np.where(fhigh_low_markers == -1, 1, np.nan) * lows).ffill().values
+running_highs = pd.Series(np.where(turning_markers == 1, 1, np.nan) * highs).ffill().values
+# running_lows = pd.Series(np.where(turning_markers == -1, 1, np.nan) * lows).ffill().values
+
+running_highs = np.full(len(turning_markers), np.nan); 
+running_highs[turning_points_dn_ix] = highs[extreme_points_hi_ix[:len(turning_points_dn_ix)]]; 
+running_highs = pd.Series(running_highs).ffill().values
+# running_highs = running_highs.ffill().values
+
+running_lows = np.full(len(turning_markers), np.nan); 
+running_lows[turning_points_up_ix] = lows[extreme_points_lo_ix[:len(turning_points_up_ix)]]; 
+running_lows = pd.Series(running_lows).ffill().values
+# running_lows = pd.Series(np.where(turning_markers == -1, 1, np.nan) * lows).ffill().values
+
 
 diff = running_highs - running_lows
 fib_matrix = np.outer(diff, fib_levels)
 fib_levels_array = running_lows[:, np.newaxis] + fib_matrix
 df_fibs = pd.DataFrame(fib_levels_array, columns=fib_columns, index=data.index)
 
+run_diff = (np.cumsum(turning_markers != 0) - np.cumsum(high_low_markers != 0))
+
+# df_fibs = df_fibs.multiply((np.where(run_diff < 0, np.nan, 1)), axis=0)
 ##############################################
 ##############################################
 ws, ww = len(data)-1000, 400
@@ -106,3 +124,15 @@ plt.savefig('output.png')
 plt.show()
 
 # In[ ]:
+
+
+# running_lows = np.full(len(turning_markers), np.nan); 
+# running_lows[turning_points_up_ix] = lows[extreme_points_lo_ix[:len(turning_points_up_ix)]]; 
+# running_lows = pd.Series(running_lows).ffill().values
+
+# len(turning_points_up_ix), len(extreme_points_lo_ix)
+len(turning_markers), turning_points_up_ix
+# In[]:
+# high_low_markers, 
+# fhigh_low_markers[fhigh_low_markers != 0]
+# fturning_markers[fturning_markers != 0]
