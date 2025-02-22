@@ -19,3 +19,6 @@ dependencies = [
 
 [tool.uv.sources]
 binance-connector = { git = "https://github.com/binance/binance-connector-python.git" }
+
+[tool.uv.workspace]
+members = ["ZigZag"]
