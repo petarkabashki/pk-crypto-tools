@@ -27,11 +27,11 @@ dir(zigzag)
 
 # fib_levels = np.array([-1.0, -0.786, -0.618, -0.5, -0.414, -0.382, -0.236, 0.0, 0.236, 0.382, 0.414, 0.5, 0.618, 0.786, 1.0, 1.236, 1.5, 1.618, 1.786, 2.0, 2.236, 2.382, 2.5, 2.628, 2.786, 3, 3.382, 3.618, 4, 5])
 # fib_levels = np.array([-1.0, -0.786, -0.618, -0.5, -0.414, -0.382, -0.236, 0.0, 0.236, 0.382, 0.414, 0.5, 0.618, 0.786, 1.0, 1.236, 1.414, 1.5, 1.618, 1.786, 2.0])
-fib_levels = np.array([-1.0, -0.786, -0.618, -0.5, -0.236, 0.0, 0.236, 0.5, 0.618, 0.786, 1.0, 1.236, 1.5, 1.618, 1.786, 2.0])
+fib_levels = np.array([-1.0, -0.786, -0.618, -0.5, -0.414, -0.236, 0.0, 0.236, 0.414, 0.5, 0.618, 0.786, 1.0, 1.236, 1.414, 1.5, 1.618, 1.786, 2.0])
 
 fib_columns = [f'fib({fib})' for fib in fib_levels]
 
-exchange,base,quote,timeframe = 'binance','ETH', 'USDT', '2h'
+exchange,base,quote,timeframe = 'binance','ETH', 'USDT', '4h'
 data = load_candles(exchange,base,quote,timeframe)#.apply(np.log)
 epsilon = 0.10
 highs = data['high'].values
@@ -131,7 +131,7 @@ plt.show()
 # running_lows = pd.Series(running_lows).ffill().values
 
 # len(turning_points_up_ix), len(extreme_points_lo_ix)
-len(turning_markers), turning_points_up_ix
+# len(turning_markers), turning_points_up_ix
 # In[]:
 # high_low_markers, 
 # fhigh_low_markers[fhigh_low_markers != 0]
