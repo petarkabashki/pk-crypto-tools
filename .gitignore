@@ -21,3 +21,4 @@ key.enc
 .env
 node_modules
 build
+price-data
